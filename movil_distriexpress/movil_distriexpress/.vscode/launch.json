@@ -1,0 +1,18 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Flutter Web (Chrome Maps)",
+      "request": "launch",
+      "type": "dart",
+      "deviceId": "chrome",
+      "args": [
+        "--no-web-resources-cdn",
+        "--web-hostname",
+        "localhost",
+        "--web-port",
+        "65056"
+      ]
+    }
+  ]
+}

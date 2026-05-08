@@ -1,0 +1,12 @@
+[
+  { "id": 1, "nombre": "Arroz Integral Orgánico", "public_id": "", "url": "" },
+  { "id": 2, "nombre": "Aceite de Oliva Extra Virgen", "public_id": "", "url": "" },
+  { "id": 3, "nombre": "Quinoa Real Premium", "public_id": "", "url": "" },
+  { "id": 4, "nombre": "Sal Marina Fina", "public_id": "", "url": "" },
+  { "id": 5, "nombre": "Pasta Fusilli Integral", "public_id": "", "url": "" },
+  { "id": 6, "nombre": "Lentejas Rojas", "public_id": "", "url": "" },
+  { "id": 7, "nombre": "Miel de Abeja Pura", "public_id": "", "url": "" },
+  { "id": 8, "nombre": "Avena en Hojuelas", "public_id": "", "url": "" },
+  { "id": 9, "nombre": "Vinagre Balsámico", "public_id": "", "url": "" },
+  { "id": 10, "nombre": "Garbanzos Secos", "public_id": "", "url": "" }
+]
