@@ -418,7 +418,7 @@ class _PromotorDetalleScreenState extends State<PromotorDetalleScreen> {
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: widget.cliente.atendido
+                  onPressed: widget.cliente.estado == EstadoCliente.atendido
                       ? null
                       : () {
                           showDialog(
@@ -431,19 +431,9 @@ class _PromotorDetalleScreenState extends State<PromotorDetalleScreen> {
                               actions: [
                                 TextButton(
                                   onPressed: () {
-                                    context.read<AppState>().marcarClienteAtendido(widget.cliente.id);
                                     Navigator.pop(ctx);
+                                    context.read<AppState>().cambiarEstadoCliente(widget.cliente.id, EstadoCliente.atendido);
                                     Navigator.pop(context);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('${widget.cliente.nombre} marcado como atendido'),
-                                        backgroundColor: AppTheme.success,
-                                        behavior: SnackBarBehavior.floating,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(10),
-                                        ),
-                                      ),
-                                    );
                                   },
                                   child: const Text('No'),
                                 ),
@@ -478,7 +468,7 @@ class _PromotorDetalleScreenState extends State<PromotorDetalleScreen> {
                                           fromDelivery: true,
                                           fixedPedidoId: pedidoPendiente.id,
                                           onAbonoRegistered: () {
-                                            context.read<AppState>().marcarClienteAtendido(widget.cliente.id);
+                                            context.read<AppState>().cambiarEstadoCliente(widget.cliente.id, EstadoCliente.atendido);
                                             Navigator.pop(context);
                                             ScaffoldMessenger.of(context).showSnackBar(
                                               SnackBar(
@@ -499,12 +489,12 @@ class _PromotorDetalleScreenState extends State<PromotorDetalleScreen> {
                           );
                         },
                   icon: Icon(
-                    widget.cliente.atendido ? Icons.check_circle : Icons.check_rounded,
+                    widget.cliente.estado == EstadoCliente.atendido ? Icons.check_circle : Icons.check_rounded,
                     size: 18,
                   ),
-                  label: Text(widget.cliente.atendido ? 'Atendido ✓' : 'ATENDIDO'),
+                  label: Text(widget.cliente.estado == EstadoCliente.atendido ? 'Atendido ✓' : 'ATENDIDO'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: widget.cliente.atendido
+                    backgroundColor: widget.cliente.estado == EstadoCliente.atendido
                         ? AppTheme.success
                         : AppTheme.promotorColor,
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -573,45 +563,50 @@ class _PedidoCard extends StatelessWidget {
           const Divider(height: 1, color: AppTheme.border),
           Padding(
             padding: const EdgeInsets.all(12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Column(
               children: [
-                Text(
-                  DateFormat('dd MMM yyyy', 'es_CO').format(pedido.fecha),
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Total: \$${fmt.format(pedido.total)}',
+                      DateFormat('dd MMM yyyy', 'es_CO').format(pedido.fecha),
                       style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: AppTheme.textPrimary,
+                        fontSize: 12,
+                        color: AppTheme.textSecondary,
                       ),
                     ),
-                    if (pedido.totalAbonado > 0)
-                      Text(
-                        'Abonado: \$${fmt.format(pedido.totalAbonado)}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppTheme.success,
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          'Total: \$${fmt.format(pedido.total)}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.textPrimary,
+                          ),
                         ),
-                      ),
-                    if (pedido.saldoPendiente > 0)
-                      Text(
-                        'Pendiente: \$${fmt.format(pedido.saldoPendiente)}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppTheme.error,
-                        ),
-                      ),
+                        if (pedido.totalAbonado > 0)
+                          Text(
+                            'Abonado: \$${fmt.format(pedido.totalAbonado)}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.success,
+                            ),
+                          ),
+                        if (pedido.saldoPendiente > 0)
+                          Text(
+                            'Pendiente: \$${fmt.format(pedido.saldoPendiente)}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.error,
+                            ),
+                          ),
+                      ],
+                    ),
                   ],
                 ),
+                const SizedBox(height: 12),
               ],
             ),
           ),

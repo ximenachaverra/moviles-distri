@@ -1,9 +1,33 @@
 // models/enums
 enum UserRole { repartidor, promotor }
 
+enum EstadoCliente {
+  pendiente,
+  atendido;
+
+  String get label {
+    switch (this) {
+      case EstadoCliente.pendiente:
+        return 'Pendiente';
+      case EstadoCliente.atendido:
+        return 'Atendido';
+    }
+  }
+
+  static EstadoCliente fromString(String s) {
+    switch (s.toLowerCase()) {
+      case 'atendido':
+        return EstadoCliente.atendido;
+      default:
+        return EstadoCliente.pendiente;
+    }
+  }
+}
+
 enum EstadoPedido {
   pendiente,
   enProceso,
+  atendido,
   pendientePorPago,
   pagado,
   anulado;
@@ -14,6 +38,8 @@ enum EstadoPedido {
         return 'Pendiente';
       case EstadoPedido.enProceso:
         return 'En proceso';
+      case EstadoPedido.atendido:
+        return 'Atendido';
       case EstadoPedido.pendientePorPago:
         return 'Pendiente por pago';
       case EstadoPedido.pagado:
@@ -27,6 +53,8 @@ enum EstadoPedido {
     switch (s) {
       case 'En proceso':
         return EstadoPedido.enProceso;
+      case 'Atendido':
+        return EstadoPedido.atendido;
       case 'Pendiente por pago':
         return EstadoPedido.pendientePorPago;
       case 'Pagado':
@@ -132,7 +160,7 @@ class ClienteModel {
   final double lat;
   final double lng;
   final double saldoPendiente;
-  bool atendido;
+  EstadoCliente estado;
 
   ClienteModel({
     required this.id,
@@ -142,7 +170,7 @@ class ClienteModel {
     required this.lat,
     required this.lng,
     this.saldoPendiente = 0,
-    this.atendido = false,
+    this.estado = EstadoCliente.pendiente,
   });
 
   factory ClienteModel.fromJson(Map<String, dynamic> json) => ClienteModel(
@@ -154,6 +182,7 @@ class ClienteModel {
         lng: _toDouble(json['longitud'] ?? json['lng']),
         saldoPendiente:
             _toDouble(json['saldo_pendiente'] ?? json['saldoPendiente']),
+        estado: EstadoCliente.fromString((json['estado'] ?? 'pendiente').toString()),
       );
 }
 
@@ -206,7 +235,7 @@ class AbonoPedido {
 
 class ItemPedido {
   final ProductoModel producto;
-  final int cantidad;
+  int cantidad;
   bool checked;
 
   ItemPedido({
@@ -231,12 +260,13 @@ class ItemPedido {
 class PedidoModel {
   final String id;
   final ClienteModel cliente;
-  final List<ItemPedido> items;
+  late List<ItemPedido> items;
   final DateTime fecha;
   final double? subtotalDb;
   final double? ivaDb;
   final double? totalDb;
   DateTime? fechaEntrega;
+  DateTime? fechaModificacion;
   EstadoPedido estado;
   String origen;
   String observaciones;
@@ -246,18 +276,21 @@ class PedidoModel {
   PedidoModel({
     required this.id,
     required this.cliente,
-    required this.items,
+    required List<ItemPedido> items,
     required this.fecha,
     this.subtotalDb,
     this.ivaDb,
     this.totalDb,
     this.fechaEntrega,
+    this.fechaModificacion,
     this.estado = EstadoPedido.pendiente,
     this.origen = 'pedido',
     this.observaciones = '',
     List<AbonoPedido>? abonosPedido,
     this.entregado = false,
-  }) : abonosPedido = abonosPedido ?? [];
+  }) : abonosPedido = abonosPedido ?? [] {
+    this.items = items;
+  }
 
   factory PedidoModel.fromJson(
     Map<String, dynamic> json, {

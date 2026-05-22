@@ -27,6 +27,7 @@ class PromotorAbonosScreen extends StatefulWidget {
 
 class _PromotorAbonosScreenState extends State<PromotorAbonosScreen> {
   String? _selectedClienteId;
+  String? _selectedPedidoId; // Nuevo: para seleccionar pedido específico
   final _montoController = TextEditingController();
   final _obsController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
@@ -56,6 +57,15 @@ class _PromotorAbonosScreenState extends State<PromotorAbonosScreen> {
   }
 
   double _saldoPermitido(AppState state, ClienteModel selectedCliente) {
+    // Si hay un pedido seleccionado, usa el saldo del pedido
+    if (_selectedPedidoId != null) {
+      try {
+        final pedido = state.pedidos.firstWhere((p) => p.id == _selectedPedidoId);
+        return pedido.saldoPendiente;
+      } catch (_) {
+        // Si no encuentra el pedido, falla silenciosamente
+      }
+    }
     final pedido = _pedidoFijo(state);
     if (pedido != null) return pedido.saldoPendiente;
     final pedidos = state.pedidosPorCliente(selectedCliente.id);
@@ -97,7 +107,31 @@ class _PromotorAbonosScreenState extends State<PromotorAbonosScreen> {
     if (!mounted) return;
 
     final pedidoFijo = _pedidoFijo(state);
-    if (pedidoFijo != null) {
+    // Si hay un pedido seleccionado en el dropdown, usar ese
+    if (_selectedPedidoId != null && _selectedPedidoId!.isNotEmpty) {
+      try {
+        final pedidoSeleccionado =
+            state.pedidos.firstWhere((p) => p.id == _selectedPedidoId);
+        await state.agregarAbonoPedido(
+          pedidoSeleccionado.id,
+          AbonoPedido(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            monto: monto,
+            tipo: 'Efectivo',
+            fecha: DateTime.now(),
+          ),
+        );
+      } catch (e) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al registrar abono: $e'),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+        return;
+      }
+    } else if (pedidoFijo != null) {
       await state.agregarAbonoPedido(
         pedidoFijo.id,
         AbonoPedido(
@@ -308,11 +342,114 @@ class _PromotorAbonosScreenState extends State<PromotorAbonosScreen> {
                                     ),
                                   )
                                   .toList(),
-                              onChanged: (c) =>
-                                  setState(() => _selectedClienteId = c?.id),
+                              onChanged: (c) {
+                                setState(() {
+                                  _selectedClienteId = c?.id;
+                                  _selectedPedidoId = null; // Reset pedido al cambiar cliente
+                                });
+                              },
                             ),
                           ),
                         ),
+
+                      // Selector de pedido (solo si hay múltiples pedidos)
+                      if (selectedCliente != null) ...[
+                        const SizedBox(height: 16),
+                        Builder(builder: (context) {
+                          final pedidosDelCliente =
+                              state.pedidosPorCliente(selectedCliente.id);
+                          if (pedidosDelCliente.length > 1) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Selecciona un pedido (opcional)',
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppTheme.textSecondary),
+                                ),
+                                const SizedBox(height: 8),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.background,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: AppTheme.border),
+                                  ),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<String>(
+                                      value: _selectedPedidoId,
+                                      hint: const Padding(
+                                        padding: EdgeInsets.symmetric(
+                                            horizontal: 16),
+                                        child: Text(
+                                            'Sin pedido específico',
+                                            style: TextStyle(
+                                                color:
+                                                    AppTheme.textSecondary,
+                                                fontSize: 14)),
+                                      ),
+                                      isExpanded: true,
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 12),
+                                      borderRadius:
+                                          BorderRadius.circular(12),
+                                      items: pedidosDelCliente
+                                          .map(
+                                            (p) => DropdownMenuItem(
+                                              value: p.id,
+                                              child: Row(
+                                                children: [
+                                                  const Icon(
+                                                      Icons
+                                                          .receipt_long_rounded,
+                                                      size: 16,
+                                                      color: AppTheme
+                                                          .textSecondary),
+                                                  const SizedBox(width: 8),
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      children: [
+                                                        Text(
+                                                          'Pedido #${p.id.length > 6 ? p.id.substring(p.id.length - 6) : p.id}',
+                                                          style: const TextStyle(
+                                                              fontSize: 14,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w600),
+                                                        ),
+                                                        Text(
+                                                          'Total: \$${fmt.format(p.total)} | Saldo: \$${fmt.format(p.saldoPendiente)}',
+                                                          style: const TextStyle(
+                                                              fontSize: 11,
+                                                              color: AppTheme
+                                                                  .textSecondary),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          )
+                                          .toList(),
+                                      onChanged: (p) =>
+                                          setState(() =>
+                                              _selectedPedidoId = p),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          }
+                          return const SizedBox.shrink();
+                        }),
+                      ],
 
                         // Saldo pendiente del cliente/pedido
                         if (selectedCliente != null &&

@@ -2,6 +2,7 @@
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/app_state.dart';
+import '../../../data/models/models.dart';
 import '../../../core/widgets/common_widgets.dart';
 import 'repartidor_detalle_screen.dart';
 import 'abonos_screen.dart';
@@ -28,7 +29,7 @@ class _RepartidorHomeScreenState extends State<RepartidorHomeScreen> {
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
     final user = state.currentUser!;
-    final atendidos = state.clientes.where((c) => c.atendido).length;
+    final atendidos = state.clientes.where((c) => c.estado == EstadoCliente.atendido).length;
     final total = state.clientes.length;
     final query = _searchCtrl.text.trim().toLowerCase();
     final clientesFiltrados = state.clientes.where((c) {

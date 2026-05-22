@@ -22,7 +22,7 @@ class ClienteCard extends StatelessWidget {
           color: AppTheme.surface,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: cliente.atendido
+            color: cliente.estado == EstadoCliente.atendido
                 ? AppTheme.success.withValues(alpha: 0.4)
                 : AppTheme.border,
           ),
@@ -41,14 +41,14 @@ class ClienteCard extends StatelessWidget {
               width: 46,
               height: 46,
               decoration: BoxDecoration(
-                color: cliente.atendido
+                color: cliente.estado == EstadoCliente.atendido
                     ? AppTheme.success.withValues(alpha: 0.1)
                     : AppTheme.primaryLight,
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                cliente.atendido ? Icons.check_circle : Icons.store_rounded,
-                color: cliente.atendido ? AppTheme.success : AppTheme.primary,
+                cliente.estado == EstadoCliente.atendido ? Icons.check_circle : Icons.store_rounded,
+                color: cliente.estado == EstadoCliente.atendido ? AppTheme.success : AppTheme.primary,
                 size: 22,
               ),
             ),
@@ -87,7 +87,7 @@ class ClienteCard extends StatelessWidget {
               ),
             ),
             // Badge saldo / check
-            if (cliente.atendido)
+            if (cliente.estado == EstadoCliente.atendido)
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

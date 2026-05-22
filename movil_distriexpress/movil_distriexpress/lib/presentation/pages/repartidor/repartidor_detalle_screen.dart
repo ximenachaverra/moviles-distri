@@ -54,7 +54,7 @@ class _RepartidorDetalleScreenState extends State<RepartidorDetalleScreen> {
           TextButton(
             onPressed: () {
               // No recibió abono, solo marcar atendido
-              context.read<AppState>().marcarClienteAtendido(widget.cliente.id);
+              context.read<AppState>().cambiarEstadoCliente(widget.cliente.id, EstadoCliente.atendido);
               Navigator.pop(ctx);
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
@@ -74,7 +74,7 @@ class _RepartidorDetalleScreenState extends State<RepartidorDetalleScreen> {
                     preselectedCliente: widget.cliente,
                     fromDelivery: true,
                     onAbonoRegistered: () {
-                      context.read<AppState>().marcarClienteAtendido(widget.cliente.id);
+                      context.read<AppState>().cambiarEstadoCliente(widget.cliente.id, EstadoCliente.atendido);
                       Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text('Abono registrado. Entrega completada: ${widget.cliente.nombre}'), backgroundColor: AppTheme.success),
@@ -535,7 +535,7 @@ class _RepartidorDetalleScreenState extends State<RepartidorDetalleScreen> {
                       ),
                     ),
                   ),
-                  if (!widget.cliente.atendido) ...[
+                  if (widget.cliente.estado != EstadoCliente.atendido) ...[
                     const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton.icon(
@@ -931,6 +931,8 @@ class _EstadoBadge extends StatelessWidget {
         return AppTheme.warning;
       case EstadoPedido.enProceso:
         return AppTheme.primary;
+      case EstadoPedido.atendido:
+        return AppTheme.success;
       case EstadoPedido.pendientePorPago:
         return AppTheme.accentOrange;
       case EstadoPedido.pagado:

@@ -30,12 +30,19 @@ class _PromotorHomeScreenState extends State<PromotorHomeScreen> {
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
     final user = state.currentUser!;
-    final atendidos = state.clientes.where((c) => c.atendido).length;
     final query = _searchCtrl.text.trim().toLowerCase();
+    
+    // Mostrar solo clientes PENDIENTES
     final clientesFiltrados = state.clientes.where((c) {
+      if (c.estado != EstadoCliente.pendiente) return false;
+      
       if (query.isEmpty) return true;
       return '${c.nombre} ${c.zona} ${c.direccion}'.toLowerCase().contains(query);
     }).toList();
+    
+    // Contar clientes por estado
+    final pendientes = state.clientes.where((c) => c.estado == EstadoCliente.pendiente).length;
+    final atendidos = state.clientes.where((c) => c.estado == EstadoCliente.atendido).length;
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -103,8 +110,8 @@ class _PromotorHomeScreenState extends State<PromotorHomeScreen> {
                     const SizedBox(height: 12),
                     Row(children: [
                       StatCard(
-                          label: 'Clientes',
-                          value: '${state.clientes.length}',
+                          label: 'Pendientes',
+                          value: '$pendientes',
                           icon: Icons.store_rounded,
                           color: AppTheme.promotorColor),
                       const SizedBox(width: 10),
@@ -129,56 +136,70 @@ class _PromotorHomeScreenState extends State<PromotorHomeScreen> {
               child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const SectionHeader(
-                        title: 'CLIENTES EN RUTA',
-                        subtitle: 'Selecciona para crear pedido'),
-                    Row(
-                      children: [
-                        // Acceso rápido a abonos desde el header
-                        GestureDetector(
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) =>
-                                    const PromotorAbonosScreen()),
-                          ),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: AppTheme.promotorColor
-                                  .withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                  color: AppTheme.promotorColor
-                                      .withValues(alpha: 0.3)),
+                    Flexible(
+                      flex: 2,
+                      child: const SectionHeader(
+                          title: 'CLIENTES EN RUTA',
+                          subtitle: 'Selecciona para crear pedido'),
+                    ),
+                    Flexible(
+                      flex: 1,
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        alignment: WrapAlignment.end,
+                        children: [
+                          // Acceso rápido a abonos desde el header
+                          GestureDetector(
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) =>
+                                      const PromotorAbonosScreen()),
                             ),
-                            child: const Row(children: [
-                              Icon(Icons.payments_outlined,
-                                  size: 13, color: AppTheme.promotorColor),
-                              SizedBox(width: 4),
-                              Text('Abonos',
-                                  style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppTheme.promotorColor)),
-                            ]),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: AppTheme.promotorColor
+                                    .withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                    color: AppTheme.promotorColor
+                                        .withValues(alpha: 0.3)),
+                              ),
+                              child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                Icon(Icons.payments_outlined,
+                                    size: 13, color: AppTheme.promotorColor),
+                                SizedBox(width: 4),
+                                Text('Abonos',
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppTheme.promotorColor)),
+                              ]),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                              color: AppTheme.primaryLight,
-                              borderRadius: BorderRadius.circular(8)),
-                          child: Text('${state.clientes.length} clientes',
-                              style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTheme.primary)),
-                        ),
-                      ],
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            constraints: const BoxConstraints(
+                                maxWidth: 120),
+                            decoration: BoxDecoration(
+                                color: AppTheme.primaryLight,
+                                borderRadius: BorderRadius.circular(8)),
+                            child: Text('${state.clientes.length} en ruta',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.primary)),
+                          ),
+                        ],
+                      ),
                     ),
                   ]),
             ),
@@ -286,7 +307,9 @@ class _ClienteSearchDelegate extends SearchDelegate<String> {
 
   Widget _buildList(BuildContext context) {
     final q = query.trim().toLowerCase();
+    // Solo buscar entre clientes con estado PENDIENTE
     final filtered = clientes.where((c) {
+      if (c.estado != EstadoCliente.pendiente) return false;
       if (q.isEmpty) return true;
       return '${c.nombre} ${c.zona} ${c.direccion}'.toLowerCase().contains(q);
     }).toList();

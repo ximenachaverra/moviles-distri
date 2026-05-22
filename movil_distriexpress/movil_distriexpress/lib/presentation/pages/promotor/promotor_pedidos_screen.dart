@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
@@ -7,6 +8,7 @@ import '../../../data/models/app_state.dart';
 import '../../../data/models/models.dart';
 import '../../../core/widgets/common_widgets.dart';
 import 'promotor_detalle_screen.dart';
+import 'promotor_editar_pedido_screen.dart';
 
 class PromotorPedidosScreen extends StatefulWidget {
   const PromotorPedidosScreen({super.key});
@@ -19,6 +21,12 @@ class _PromotorPedidosScreenState extends State<PromotorPedidosScreen> {
   final fmt = NumberFormat('#,###', 'es_CO');
   ClienteModel? _clienteSeleccionado;
   final TextEditingController _searchCtrl = TextEditingController();
+  
+  // Filtros de fecha
+  DateTime? _fechaInicio;
+  DateTime? _fechaFin;
+  int? _mesFiltro;
+  int? _anoFiltro;
 
   @override
   void initState() {
@@ -27,6 +35,221 @@ class _PromotorPedidosScreenState extends State<PromotorPedidosScreen> {
       final state = context.read<AppState>();
       if (state.productos.isEmpty) state.fetchProductos();
     });
+  }
+
+  bool _pedidoMatchesFiltros(PedidoModel pedido) {
+    // Filtro por fecha específica
+    if (_fechaInicio != null) {
+      final pedidoDate = DateTime(pedido.fecha.year, pedido.fecha.month, pedido.fecha.day);
+      final filterDate = DateTime(_fechaInicio!.year, _fechaInicio!.month, _fechaInicio!.day);
+      if (pedidoDate.isBefore(filterDate)) return false;
+    }
+    
+    if (_fechaFin != null) {
+      final pedidoDate = DateTime(pedido.fecha.year, pedido.fecha.month, pedido.fecha.day);
+      final filterDate = DateTime(_fechaFin!.year, _fechaFin!.month, _fechaFin!.day);
+      if (pedidoDate.isAfter(filterDate)) return false;
+    }
+    
+    // Filtro por mes
+    if (_mesFiltro != null && pedido.fecha.month != _mesFiltro) return false;
+    
+    // Filtro por año
+    if (_anoFiltro != null && pedido.fecha.year != _anoFiltro) return false;
+    
+    return true;
+  }
+
+  String _getMonthName(int month) {
+    final months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+                    'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    return months[month - 1];
+  }
+
+  Widget _buildFilterChip({
+    required IconData icon,
+    required String label,
+    required bool isActive,
+    required VoidCallback onTap,
+    required VoidCallback onClear,
+  }) {
+    return GestureDetector(
+      onTap: isActive ? onClear : onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive
+              ? AppTheme.primary.withValues(alpha: 0.1)
+              : AppTheme.border,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+              color: isActive
+                  ? AppTheme.primary.withValues(alpha: 0.3)
+                  : Colors.transparent),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 14, color: isActive ? AppTheme.primary : AppTheme.textSecondary),
+            const SizedBox(width: 4),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: isActive ? AppTheme.primary : AppTheme.textSecondary)),
+            if (isActive) ...[
+              const SizedBox(width: 4),
+              const Icon(Icons.close, size: 12, color: AppTheme.primary),
+            ]
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDateFilterChip({
+    required IconData icon,
+    required String label,
+    required bool isActive,
+    required VoidCallback onTap,
+    required VoidCallback onClear,
+  }) {
+    return GestureDetector(
+      onTap: isActive ? onClear : onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive
+              ? AppTheme.promotorColor.withValues(alpha: 0.1)
+              : AppTheme.border,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+              color: isActive
+                  ? AppTheme.promotorColor.withValues(alpha: 0.3)
+                  : Colors.transparent),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 14, color: isActive ? AppTheme.promotorColor : AppTheme.textSecondary),
+            const SizedBox(width: 4),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: isActive ? AppTheme.promotorColor : AppTheme.textSecondary)),
+            if (isActive) ...[
+              const SizedBox(width: 4),
+              const Icon(Icons.close, size: 12, color: AppTheme.promotorColor),
+            ]
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showMonthPicker() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Selecciona un mes'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: GridView.builder(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+            ),
+            itemCount: 12,
+            itemBuilder: (context, index) {
+              final month = index + 1;
+              final isSelected = _mesFiltro == month;
+              return GestureDetector(
+                onTap: () {
+                  setState(() => _mesFiltro = month);
+                  Navigator.pop(context);
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? AppTheme.primary
+                        : AppTheme.background,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color: isSelected ? Colors.transparent : AppTheme.border),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    _getMonthName(month),
+                    style: TextStyle(
+                        color: isSelected ? Colors.white : AppTheme.textPrimary,
+                        fontWeight: FontWeight.w600),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showYearPicker() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Selecciona un año'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: GridView.builder(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+            ),
+            itemCount: 5,
+            itemBuilder: (context, index) {
+              final year = DateTime.now().year - 4 + index;
+              final isSelected = _anoFiltro == year;
+              return GestureDetector(
+                onTap: () {
+                  setState(() => _anoFiltro = year);
+                  Navigator.pop(context);
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? AppTheme.primary
+                        : AppTheme.background,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color: isSelected ? Colors.transparent : AppTheme.border),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    year.toString(),
+                    style: TextStyle(
+                        color: isSelected ? Colors.white : AppTheme.textPrimary,
+                        fontWeight: FontWeight.w600),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -57,16 +280,17 @@ class _PromotorPedidosScreenState extends State<PromotorPedidosScreen> {
   Widget _buildClienteList(AppState state) {
     final clientesConPedidos =
         state.clientes.where((c) => state.pedidosPorCliente(c.id).isNotEmpty).toList();
-    final clientesSinPedidos =
-        state.clientes.where((c) => state.pedidosPorCliente(c.id).isEmpty).toList();
 
-    if (state.clientes.isEmpty) {
+    if (clientesConPedidos.isEmpty) {
       return const Center(
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
           Icon(Icons.receipt_long_rounded, size: 56, color: AppTheme.textSecondary),
           SizedBox(height: 12),
-          Text('Sin pedidos aún',
+          Text('Sin pedidos registrados',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+          SizedBox(height: 8),
+          Text('Los clientes con pedidos aparecerán aquí',
+              style: TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
         ]),
       );
     }
@@ -100,79 +324,173 @@ class _PromotorPedidosScreenState extends State<PromotorPedidosScreen> {
           ]),
         ),
       ),
-      if (clientesConPedidos.isNotEmpty) ...[
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            child: TextField(
-              controller: _searchCtrl,
-              onChanged: (v) => setState(() {}),
-              decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.search_rounded),
-                hintText: 'Buscar clientes, pedidos o zonas...',
-              ),
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          child: TextField(
+            controller: _searchCtrl,
+            onChanged: (v) => setState(() {}),
+            decoration: const InputDecoration(
+              prefixIcon: Icon(Icons.search_rounded),
+              hintText: 'Buscar clientes, pedidos o zonas...',
             ),
           ),
         ),
-        SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          sliver: SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final q = _searchCtrl.text.trim().toLowerCase();
-                final filtered = clientesConPedidos
-                    .where((c) => q.isEmpty
-                        ? true
-                        : ('${c.nombre} ${c.zona} ${c.direccion}').toLowerCase().contains(q))
-                    .toList();
-                final c = filtered[index];
-                final pedidos = state.pedidosPorCliente(c.id);
-                return _ClientePedidoCard(
-                  cliente: c,
-                  pedidos: pedidos,
-                  fmt: fmt,
-                  onTap: () => setState(() => _clienteSeleccionado = c),
-                );
-              },
-              childCount: clientesConPedidos
-                  .where((c) => _searchCtrl.text.trim().isEmpty
+      ),
+      // Filtros de fecha
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                // Filtro por fecha específica
+                _buildDateFilterChip(
+                  icon: Icons.calendar_today_rounded,
+                  label: _fechaInicio != null
+                      ? DateFormat('dd MMM', 'es_CO').format(_fechaInicio!)
+                      : 'Desde',
+                  isActive: _fechaInicio != null,
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: _fechaInicio ?? DateTime.now(),
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime.now(),
+                    );
+                    if (picked != null) {
+                      setState(() => _fechaInicio = picked);
+                    }
+                  },
+                  onClear: () => setState(() => _fechaInicio = null),
+                ),
+                const SizedBox(width: 8),
+                _buildDateFilterChip(
+                  icon: Icons.calendar_today_rounded,
+                  label: _fechaFin != null
+                      ? DateFormat('dd MMM', 'es_CO').format(_fechaFin!)
+                      : 'Hasta',
+                  isActive: _fechaFin != null,
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: _fechaFin ?? DateTime.now(),
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime.now(),
+                    );
+                    if (picked != null) {
+                      setState(() => _fechaFin = picked);
+                    }
+                  },
+                  onClear: () => setState(() => _fechaFin = null),
+                ),
+                const SizedBox(width: 8),
+                // Filtro por mes
+                _buildFilterChip(
+                  icon: Icons.date_range_rounded,
+                  label: _mesFiltro != null ? _getMonthName(_mesFiltro!) : 'Mes',
+                  isActive: _mesFiltro != null,
+                  onTap: () => _showMonthPicker(),
+                  onClear: () => setState(() => _mesFiltro = null),
+                ),
+                const SizedBox(width: 8),
+                // Filtro por año
+                _buildFilterChip(
+                  icon: Icons.event_outlined,
+                  label: _anoFiltro != null ? _anoFiltro.toString() : 'Año',
+                  isActive: _anoFiltro != null,
+                  onTap: () => _showYearPicker(),
+                  onClear: () => setState(() => _anoFiltro = null),
+                ),
+                const SizedBox(width: 8),
+                // Botón limpiar todos
+                if (_fechaInicio != null ||
+                    _fechaFin != null ||
+                    _mesFiltro != null ||
+                    _anoFiltro != null)
+                  GestureDetector(
+                    onTap: () => setState(() {
+                      _fechaInicio = null;
+                      _fechaFin = null;
+                      _mesFiltro = null;
+                      _anoFiltro = null;
+                    }),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.error.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                            color: AppTheme.error.withValues(alpha: 0.3)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.clear_rounded,
+                              size: 14, color: AppTheme.error),
+                          SizedBox(width: 4),
+                          Text('Limpiar',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.error)),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        sliver: SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) {
+              final q = _searchCtrl.text.trim().toLowerCase();
+              final filtered = clientesConPedidos
+                  .where((c) => q.isEmpty
                       ? true
-                      : ('${c.nombre} ${c.zona} ${c.direccion}').toLowerCase().contains(_searchCtrl.text.trim().toLowerCase()))
-                  .length,
-            ),
+                      : ('${c.nombre} ${c.zona} ${c.direccion}').toLowerCase().contains(q))
+                  .toList();
+              final c = filtered[index];
+              // Filtrar pedidos según criterios de fecha
+              final todosPedidos = state.pedidosPorCliente(c.id);
+              final pedidos = todosPedidos
+                  .where((p) => _pedidoMatchesFiltros(p))
+                  .toList();
+              
+              // Solo mostrar cliente si tiene pedidos después de aplicar filtros
+              if (pedidos.isEmpty) {
+                return const SizedBox.shrink();
+              }
+              
+              return _ClientePedidoCard(
+                cliente: c,
+                pedidos: pedidos,
+                fmt: fmt,
+                onTap: () => setState(() => _clienteSeleccionado = c),
+              );
+            },
+            childCount: clientesConPedidos
+                .where((c) => _searchCtrl.text.trim().isEmpty
+                    ? true
+                    : ('${c.nombre} ${c.zona} ${c.direccion}').toLowerCase().contains(_searchCtrl.text.trim().toLowerCase()))
+                .length,
           ),
         ),
-      ],
-      if (clientesSinPedidos.isNotEmpty) ...[
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-            child: SectionHeader(
-              title: 'SIN PEDIDOS',
-              subtitle: '${clientesSinPedidos.length} clientes pendientes',
-            ),
-          ),
-        ),
-        SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          sliver: SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (_, i) => ClienteCard(
-                cliente: clientesSinPedidos[i],
-                onTap: () => Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => PromotorDetalleScreen(cliente: clientesSinPedidos[i]))),
-              ),
-              childCount: clientesSinPedidos.length,
-            ),
-          ),
-        ),
-      ],
+      ),
       const SliverToBoxAdapter(child: SizedBox(height: 24)),
     ]);
   }
 
   Widget _buildPedidoDetalle(AppState state, ClienteModel cliente) {
-    final pedidos = state.pedidosPorCliente(cliente.id);
+    final todosPedidos = state.pedidosPorCliente(cliente.id);
+    // Aplicar filtros de fecha
+    final pedidos = todosPedidos
+        .where((p) => _pedidoMatchesFiltros(p))
+        .toList();
 
     return Column(children: [
       GestureDetector(
@@ -242,6 +560,7 @@ class _ClientePedidoCard extends StatelessWidget {
     switch (e) {
       case EstadoPedido.pendiente:        return AppTheme.warning;
       case EstadoPedido.enProceso:        return AppTheme.primary;
+      case EstadoPedido.atendido:         return AppTheme.success;
       case EstadoPedido.pendientePorPago: return AppTheme.accentOrange;
       case EstadoPedido.pagado:           return AppTheme.success;
       case EstadoPedido.anulado:          return AppTheme.error;
@@ -341,6 +660,7 @@ class _PedidoDetalleCard extends StatelessWidget {
     switch (pedido.estado) {
       case EstadoPedido.pendiente:        return AppTheme.warning;
       case EstadoPedido.enProceso:        return AppTheme.primary;
+      case EstadoPedido.atendido:         return AppTheme.success;
       case EstadoPedido.pendientePorPago: return AppTheme.accentOrange;
       case EstadoPedido.pagado:           return AppTheme.success;
       case EstadoPedido.anulado:          return AppTheme.error;
@@ -455,7 +775,30 @@ class _PedidoDetalleCard extends StatelessWidget {
             ]),
           ),
         ),
-        const SizedBox(height: 14),
+        // Botón Editar
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+          child: SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PromotorEditarPedidoScreen(pedido: pedido),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.edit_rounded, size: 18),
+              label: const Text('Editar Pedido'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ),
+        ),
       ]),
     );
   }
@@ -813,6 +1156,7 @@ class _CrearPedidoScreenState extends State<CrearPedidoScreen> {
                                     controller: _controllerFor(p.id),
                                     textAlign: TextAlign.center,
                                     keyboardType: TextInputType.number,
+                                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                                     decoration: const InputDecoration(
                                       border: InputBorder.none,
                                       isDense: true,

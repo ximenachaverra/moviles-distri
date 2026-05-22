@@ -276,6 +276,7 @@ class AppState extends ChangeNotifier {
         lat: 6.1586,
         lng: -75.3742,
         saldoPendiente: 125000,
+        estado: EstadoCliente.pendiente,
       ),
       ClienteModel(
         id: '2',
@@ -285,7 +286,7 @@ class AppState extends ChangeNotifier {
         lat: 6.1742,
         lng: -75.6012,
         saldoPendiente: 75000,
-        atendido: true,
+        estado: EstadoCliente.pendiente,
       ),
       ClienteModel(
         id: '3',
@@ -295,6 +296,7 @@ class AppState extends ChangeNotifier {
         lat: 6.2145,
         lng: -75.5765,
         saldoPendiente: 0,
+        estado: EstadoCliente.pendiente,
       ),
       ClienteModel(
         id: '4',
@@ -304,6 +306,7 @@ class AppState extends ChangeNotifier {
         lat: 6.1693,
         lng: -75.5803,
         saldoPendiente: 200000,
+        estado: EstadoCliente.pendiente,
       ),
     ];
 
@@ -349,11 +352,32 @@ class AppState extends ChangeNotifier {
     ];
   }
 
-  void marcarClienteAtendido(String clienteId) {
+  Future<void> cambiarEstadoCliente(String clienteId, EstadoCliente nuevoEstado) async {
     final idx = _clientes.indexWhere((c) => c.id == clienteId);
     if (idx >= 0) {
-      _clientes[idx].atendido = true;
+      final estadoAnterior = _clientes[idx].estado;
+      // Actualizar localmente de inmediato
+      _clientes[idx].estado = nuevoEstado;
       notifyListeners();
+
+      // Sincronizar con servidor si es un ID de BD
+      if (_token != null && _esIdDeApi(clienteId)) {
+        try {
+          await _dio.patch(
+            '${ApiConfig.clientes}/$clienteId/estado',
+            data: {'estado': nuevoEstado.label.toLowerCase()},
+          );
+          // Forzar refresco desde servidor para asegurar consistencia
+          await fetchClientes();
+        } catch (e) {
+          // Si falla la sincronización, revertir el cambio local
+          _clientes[idx].estado = estadoAnterior;
+          notifyListeners();
+          // ignore: avoid_print
+          print('[AppState] Error cambiarEstadoCliente: $e');
+          rethrow;
+        }
+      }
     }
   }
 
@@ -415,7 +439,7 @@ class AppState extends ChangeNotifier {
         lng: _clientes[idx].lng,
         saldoPendiente:
             (_clientes[idx].saldoPendiente - monto).clamp(0, double.infinity),
-        atendido: _clientes[idx].atendido,
+        estado: _clientes[idx].estado,
       );
     }
     notifyListeners();
@@ -550,4 +574,64 @@ class AppState extends ChangeNotifier {
 
   List<PedidoModel> pedidosPorCliente(String clienteId) =>
       _pedidos.where((p) => p.cliente.id == clienteId).toList();
+
+  /// Recalcula el estado de un cliente basado en sus pedidos
+  /// - 'pendiente' si tiene algún pedido en progreso O no tiene pedidos
+  /// - 'atendido' si todos sus pedidos están en estado terminal (Pagado, Anulado, Atendido)
+  void _recalcularEstadoCliente(String clienteId) {
+    final idx = _clientes.indexWhere((c) => c.id == clienteId);
+    if (idx >= 0) {
+      final pedidosDelCliente = pedidosPorCliente(clienteId);
+      
+      // Si no tiene pedidos o tiene pedidos que aún no están en estado terminal
+      final tienePedidosPendientes = pedidosDelCliente.isEmpty ||
+          pedidosDelCliente.any((p) => 
+            p.estado != EstadoPedido.pagado &&
+            p.estado != EstadoPedido.anulado &&
+            p.estado != EstadoPedido.atendido
+          );
+
+      final nuevoEstado = tienePedidosPendientes 
+        ? EstadoCliente.pendiente 
+        : EstadoCliente.atendido;
+      
+      _clientes[idx].estado = nuevoEstado;
+    }
+  }
+
+  /// Marca un pedido como "Atendido"
+  Future<void> marcarPedidoAtendido(String pedidoId) async {
+    final idx = _pedidos.indexWhere((p) => p.id == pedidoId);
+    if (idx >= 0) {
+      final estadoAnterior = _pedidos[idx].estado;
+      final clienteId = _pedidos[idx].cliente.id;
+      
+      // Actualizar localmente de inmediato
+      _pedidos[idx].estado = EstadoPedido.atendido;
+      _recalcularEstadoCliente(clienteId); // Recalcular estado del cliente
+      notifyListeners();
+
+      // Sincronizar con servidor
+      if (_token != null) {
+        try {
+          await _dio.patch(
+            '${ApiConfig.pedidos}/$pedidoId/estado',
+          );
+          // No llamar a fetchPedidos/fetchClientes para evitar conflictos de navegación
+          // El estado se actualiza localmente y la próxima vez que se abra una pantalla se sincronizará
+        } catch (e) {
+          // Si falla, revertir el cambio local
+          _pedidos[idx].estado = estadoAnterior;
+          _recalcularEstadoCliente(clienteId); // Revertir estado del cliente
+          notifyListeners();
+          // ignore: avoid_print
+          print('[AppState] Error marcarPedidoAtendido: $e');
+          rethrow;
+        }
+      }
+    }
+  }
+
+  // Getter para acceder a Dio desde fuera de AppState
+  Dio getDio() => _dio;
 }
