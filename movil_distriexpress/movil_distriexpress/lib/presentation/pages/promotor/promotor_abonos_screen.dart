@@ -356,8 +356,23 @@ class _PromotorAbonosScreenState extends State<PromotorAbonosScreen> {
                       if (selectedCliente != null) ...[
                         const SizedBox(height: 16),
                         Builder(builder: (context) {
-                          final pedidosDelCliente =
-                              state.pedidosPorCliente(selectedCliente.id);
+                          var pedidosDelCliente = state
+                              .pedidosPorCliente(selectedCliente.id)
+                              .where((p) => p.saldoPendiente > 0.01)
+                              .toList();
+                          
+                          // Eliminar duplicados por ID
+                          final pedidosUnicos = <String, PedidoModel>{};
+                          for (var p in pedidosDelCliente) {
+                            pedidosUnicos[p.id] = p;
+                          }
+                          pedidosDelCliente = pedidosUnicos.values.toList();
+                          
+                          // Validar que el pedido seleccionado siga siendo válido
+                          if (_selectedPedidoId != null && 
+                              !pedidosDelCliente.any((p) => p.id == _selectedPedidoId)) {
+                            _selectedPedidoId = null;
+                          }
                           if (pedidosDelCliente.length > 1) {
                             return Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -605,27 +620,36 @@ class _PromotorAbonosScreenState extends State<PromotorAbonosScreen> {
               const SectionHeader(title: 'HISTORIAL DE ABONOS'),
               const SizedBox(height: 12),
 
-              if (state.abonos.isEmpty)
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      children: [
-                        Icon(Icons.payments_outlined,
-                            size: 48,
-                            color:
-                                AppTheme.textSecondary.withValues(alpha: 0.4)),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'No hay abonos registrados',
-                          style: TextStyle(color: AppTheme.textSecondary),
-                        ),
-                      ],
+              Builder(builder: (context) {
+                final abonosFiltrados = _selectedClienteId != null
+                    ? state.abonos
+                        .where((a) => a.clienteId == _selectedClienteId)
+                        .toList()
+                    : state.abonos;
+                if (abonosFiltrados.isEmpty)
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        children: [
+                          Icon(Icons.payments_outlined,
+                              size: 48,
+                              color:
+                                  AppTheme.textSecondary.withValues(alpha: 0.4)),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'No hay abonos registrados',
+                            style: TextStyle(color: AppTheme.textSecondary),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                )
-              else
-                ...state.abonos.map((abono) => _AbonoTile(abono: abono)),
+                  );
+                return Column(
+                  children:
+                      abonosFiltrados.map((abono) => _AbonoTile(abono: abono)).toList(),
+                );
+              }),
 
               const SizedBox(height: 24),
             ],

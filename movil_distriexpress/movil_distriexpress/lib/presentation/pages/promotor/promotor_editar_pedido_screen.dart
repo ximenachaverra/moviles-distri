@@ -6,6 +6,8 @@ import '../../../data/models/app_state.dart';
 import '../../../data/models/models.dart';
 import '../../../core/widgets/common_widgets.dart';
 import '../../../core/constants/api_config.dart';
+import 'promotor_abonos_screen.dart';
+import 'promotor_detalle_screen.dart';
 
 class PromotorEditarPedidoScreen extends StatefulWidget {
   final PedidoModel pedido;
@@ -21,7 +23,9 @@ class _PromotorEditarPedidoScreenState extends State<PromotorEditarPedidoScreen>
   late List<ProductoModel> productosDisponibles;
   String _searchQuery = '';
   bool _isLoading = false;
+  int _paginaActual = 0;
   final fmt = NumberFormat('#,###', 'es_CO');
+  final int _productosPerPage = 5;
   late TextEditingController _searchCtrl;
 
   @override
@@ -57,6 +61,14 @@ class _PromotorEditarPedidoScreenState extends State<PromotorEditarPedidoScreen>
         .where((p) => p.nombre.toLowerCase().contains(_searchQuery.toLowerCase()))
         .toList();
   }
+
+  List<ProductoModel> get productosPaginados {
+    final inicio = _paginaActual * _productosPerPage;
+    final fin = (inicio + _productosPerPage).clamp(0, productosFilterados.length);
+    return productosFilterados.sublist(inicio, fin);
+  }
+
+  int get totalPaginas => (productosFilterados.length / _productosPerPage).ceil();
 
   void _agregarProducto(ProductoModel producto) {
     setState(() {
@@ -141,7 +153,8 @@ class _PromotorEditarPedidoScreenState extends State<PromotorEditarPedidoScreen>
       state.notifyListeners();
       
       if (mounted) {
-        Navigator.pop(context);
+        // Mostrar diálogo de abono después de guardar
+        _mostrarDialogoAbono();
       }
     } catch (e) {
       if (mounted) {
@@ -152,6 +165,61 @@ class _PromotorEditarPedidoScreenState extends State<PromotorEditarPedidoScreen>
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _mostrarDialogoAbono() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Recibió abono?'),
+        content: Text(
+          '${widget.pedido.cliente.nombre} - ¿Recibió un abono en esta atención?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.pop(context);
+            },
+            child: const Text('No'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => PromotorAbonosScreen(
+                    preselectedCliente: widget.pedido.cliente,
+                    fromDelivery: false,
+                    fixedPedidoId: widget.pedido.id,
+                    onAbonoRegistered: () {
+                      Navigator.pop(context);
+                      // Volver al detalle del pedido
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => PromotorDetalleScreen(cliente: widget.pedido.cliente),
+                        ),
+                      );
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Abono registrado. ${widget.pedido.cliente.nombre}'),
+                          backgroundColor: AppTheme.success,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.promotorColor),
+            child: const Text('Sí'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -206,7 +274,10 @@ class _PromotorEditarPedidoScreenState extends State<PromotorEditarPedidoScreen>
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                   child: TextField(
                     controller: _searchCtrl,
-                    onChanged: (value) => setState(() => _searchQuery = value),
+                    onChanged: (value) => setState(() {
+                      _searchQuery = value;
+                      _paginaActual = 0;
+                    }),
                     decoration: InputDecoration(
                       hintText: 'Buscar productos...',
                       prefixIcon: const Icon(Icons.search, color: AppTheme.textSecondary, size: 18),
@@ -215,7 +286,10 @@ class _PromotorEditarPedidoScreenState extends State<PromotorEditarPedidoScreen>
                               icon: const Icon(Icons.close, size: 18),
                               onPressed: () {
                                 _searchCtrl.clear();
-                                setState(() => _searchQuery = '');
+                                setState(() {
+                                  _searchQuery = '';
+                                  _paginaActual = 0;
+                                });
                               },
                             )
                           : null,
@@ -271,28 +345,53 @@ class _PromotorEditarPedidoScreenState extends State<PromotorEditarPedidoScreen>
               ),
               SliverPadding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                sliver: SliverGrid(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 0.75,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                  ),
+                sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
-                      final producto = productosFilterados[index];
+                      final producto = productosPaginados[index];
                       final estaEnPedido = items.any((i) => i.producto.id == producto.id);
                       
-                      return _ProductoCard(
+                      return _ProductoCardSimple(
                         producto: producto,
                         estaEnPedido: estaEnPedido,
                         onAgregar: () => _agregarProducto(producto),
                       );
                     },
-                    childCount: productosFilterados.length,
+                    childCount: productosPaginados.length,
                   ),
                 ),
               ),
+
+              // Botones de paginación
+              if (productosFilterados.isNotEmpty && totalPaginas > 1)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (_paginaActual > 0)
+                          TextButton.icon(
+                            onPressed: () => setState(() => _paginaActual--),
+                            icon: const Icon(Icons.arrow_back_ios_rounded, size: 14),
+                            label: const Text('Anterior'),
+                          ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Página ${_paginaActual + 1} de $totalPaginas',
+                          style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                        ),
+                        const SizedBox(width: 12),
+                        if (_paginaActual < totalPaginas - 1)
+                          TextButton.icon(
+                            onPressed: () => setState(() => _paginaActual++),
+                            label: const Text('Ver más'),
+                            icon: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
 
               // Totales
               SliverToBoxAdapter(
@@ -455,6 +554,121 @@ class _ProductoCard extends StatelessWidget {
                 ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Producto Card Simple (Lista) ────────────────────────────────────────────
+
+class _ProductoCardSimple extends StatelessWidget {
+  final ProductoModel producto;
+  final bool estaEnPedido;
+  final VoidCallback onAgregar;
+
+  const _ProductoCardSimple({
+    required this.producto,
+    required this.estaEnPedido,
+    required this.onAgregar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fmt = NumberFormat('#,###', 'es_CO');
+    
+    return GestureDetector(
+      onTap: onAgregar,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: estaEnPedido ? AppTheme.primary : AppTheme.border,
+            width: estaEnPedido ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            // Imagen pequeña
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: AppTheme.background,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: producto.imagen != null && producto.imagen!.isNotEmpty
+                  ? Image.network(
+                      producto.imagen!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          Container(
+                            color: AppTheme.primaryLight,
+                            child: const Icon(
+                              Icons.image_not_supported_outlined,
+                              color: AppTheme.primary,
+                              size: 24,
+                            ),
+                          ),
+                    )
+                  : Container(
+                      color: AppTheme.primaryLight,
+                      child: const Icon(
+                        Icons.image_not_supported_outlined,
+                        color: AppTheme.primary,
+                        size: 24,
+                      ),
+                    ),
+            ),
+            const SizedBox(width: 12),
+            // Nombre y precio
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    producto.nombre,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '\$${fmt.format(producto.precio)}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.success,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Check o botón agregar
+            if (estaEnPedido)
+              const Icon(Icons.check_circle, color: AppTheme.primary, size: 20)
+            else
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.add_rounded,
+                  color: AppTheme.primary,
+                  size: 18,
+                ),
+              ),
           ],
         ),
       ),

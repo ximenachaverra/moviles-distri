@@ -9,6 +9,7 @@ import '../../../data/models/models.dart';
 import '../../../core/widgets/common_widgets.dart';
 import 'promotor_detalle_screen.dart';
 import 'promotor_editar_pedido_screen.dart';
+import 'promotor_abonos_screen.dart';
 
 class PromotorPedidosScreen extends StatefulWidget {
   const PromotorPedidosScreen({super.key});
@@ -64,6 +65,27 @@ class _PromotorPedidosScreenState extends State<PromotorPedidosScreen> {
     final months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
                     'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
     return months[month - 1];
+  }
+
+  void _mostrarDialogoAbonoCliente(ClienteModel cliente) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PromotorAbonosScreen(
+          preselectedCliente: cliente,
+          fromDelivery: false,
+          onAbonoRegistered: () {
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Abono registrado. ${cliente.nombre}'),
+                backgroundColor: AppTheme.success,
+              ),
+            );
+          },
+        ),
+      ),
+    );
   }
 
   Widget _buildFilterChip({
@@ -499,8 +521,6 @@ class _PromotorPedidosScreenState extends State<PromotorPedidosScreen> {
           color: AppTheme.surface,
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
           child: Row(children: [
-            const Icon(Icons.arrow_back_ios_rounded, size: 16, color: AppTheme.primary),
-            const SizedBox(width: 8),
             Container(
               width: 40, height: 40,
               decoration: BoxDecoration(color: AppTheme.primaryLight, shape: BoxShape.circle),
@@ -521,6 +541,22 @@ class _PromotorPedidosScreenState extends State<PromotorPedidosScreen> {
               child: Text(
                 '${pedidos.length} pedido${pedidos.length != 1 ? "s" : ""}',
                 style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.primary),
+              ),
+            ),
+            const SizedBox(width: 8),
+            PointerInterceptor(
+              child: SizedBox(
+                height: 32,
+                child: ElevatedButton.icon(
+                  onPressed: () => _mostrarDialogoAbonoCliente(cliente),
+                  icon: const Icon(Icons.add_card_rounded, size: 14),
+                  label: const Text('Abono', style: TextStyle(fontSize: 11)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.success,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
               ),
             ),
           ]),
@@ -788,7 +824,11 @@ class _PedidoDetalleCard extends StatelessWidget {
                   MaterialPageRoute(
                     builder: (_) => PromotorEditarPedidoScreen(pedido: pedido),
                   ),
-                );
+                ).then((_) {
+                  // Después de volver del editor, refrescar los datos del servidor
+                  final state = context.read<AppState>();
+                  state.fetchPedidos();
+                });
               },
               icon: const Icon(Icons.edit_rounded, size: 18),
               label: const Text('Editar Pedido'),
