@@ -17,7 +17,9 @@ class RepartidorHomeScreen extends StatefulWidget {
 
 class _RepartidorHomeScreenState extends State<RepartidorHomeScreen> {
   int _selectedIndex = 0;
+  int _currentPage = 0;
   final TextEditingController _searchCtrl = TextEditingController();
+  final int _clientesPorPagina = 6;
 
   @override
   void dispose() {
@@ -32,10 +34,28 @@ class _RepartidorHomeScreenState extends State<RepartidorHomeScreen> {
     final atendidos = state.clientes.where((c) => c.estado == EstadoCliente.atendido).length;
     final total = state.clientes.length;
     final query = _searchCtrl.text.trim().toLowerCase();
-    final clientesFiltrados = state.clientes.where((c) {
-      if (query.isEmpty) return true;
-      return '${c.nombre} ${c.zona} ${c.direccion}'.toLowerCase().contains(query);
-    }).toList();
+    
+    // Filtrar y ordenar: primero pendientes, luego atendidos
+    final clientesFiltrados = state.clientes
+        .where((c) =>
+            '${c.nombre} ${c.zona} ${c.direccion}'.toLowerCase().contains(query) || query.isEmpty)
+        .toList()
+        ..sort((a, b) {
+          // Pendientes primero, atendidos al final
+          if (a.estado == EstadoCliente.atendido && b.estado != EstadoCliente.atendido) return 1;
+          if (a.estado != EstadoCliente.atendido && b.estado == EstadoCliente.atendido) return -1;
+          return 0;
+        });
+    
+    // Calcular paginación
+    final totalPaginas = (clientesFiltrados.length / _clientesPorPagina).ceil();
+    if (_currentPage >= totalPaginas && totalPaginas > 0) {
+      _currentPage = totalPaginas - 1;
+    }
+    
+    final indexInicial = _currentPage * _clientesPorPagina;
+    final indexFinal = (indexInicial + _clientesPorPagina).clamp(0, clientesFiltrados.length);
+    final clientesPagina = clientesFiltrados.sublist(indexInicial, indexFinal);
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -125,16 +145,52 @@ class _RepartidorHomeScreenState extends State<RepartidorHomeScreen> {
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
-                  final cliente = clientesFiltrados[index];
+                  final cliente = clientesPagina[index];
                   return ClienteCard(
                     cliente: cliente,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => RepartidorDetalleScreen(cliente: cliente))),
                   );
                 },
-                childCount: clientesFiltrados.length,
+                childCount: clientesPagina.length,
               ),
             ),
           ),
+          // Paginación
+          if (clientesFiltrados.isNotEmpty)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      onPressed: _currentPage > 0
+                          ? () => setState(() => _currentPage--)
+                          : null,
+                      icon: const Icon(Icons.arrow_back_ios_rounded),
+                      tooltip: 'Página anterior',
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Página ${_currentPage + 1} de $totalPaginas',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: _currentPage < totalPaginas - 1
+                          ? () => setState(() => _currentPage++)
+                          : null,
+                      icon: const Icon(Icons.arrow_forward_ios_rounded),
+                      tooltip: 'Página siguiente',
+                    ),
+                  ],
+                ),
+              ),
+            ),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
         ],
       ),

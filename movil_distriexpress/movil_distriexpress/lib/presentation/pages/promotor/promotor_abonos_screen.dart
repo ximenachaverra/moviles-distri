@@ -621,11 +621,27 @@ class _PromotorAbonosScreenState extends State<PromotorAbonosScreen> {
               const SizedBox(height: 12),
 
               Builder(builder: (context) {
-                final abonosFiltrados = _selectedClienteId != null
-                    ? state.abonos
-                        .where((a) => a.clienteId == _selectedClienteId)
-                        .toList()
-                    : state.abonos;
+                List<dynamic> abonosFiltrados = [];
+
+                // Si hay un pedido específico seleccionado
+                if (_selectedPedidoId != null && _selectedPedidoId!.isNotEmpty) {
+                  try {
+                    final pedido = state.pedidos.firstWhere((p) => p.id == _selectedPedidoId);
+                    // Mostrar los abonos del pedido específico
+                    abonosFiltrados = pedido.abonosPedido;
+                  } catch (_) {
+                    // Si no encuentra el pedido, lista vacía
+                  }
+                } else if (_selectedClienteId != null) {
+                  // Si hay un cliente seleccionado, mostrar sus abonos generales
+                  abonosFiltrados = state.abonos
+                      .where((a) => a.clienteId == _selectedClienteId)
+                      .toList();
+                } else {
+                  // Sin filtro, mostrar todos los abonos
+                  abonosFiltrados = state.abonos;
+                }
+
                 if (abonosFiltrados.isEmpty)
                   return Center(
                     child: Padding(
@@ -645,9 +661,21 @@ class _PromotorAbonosScreenState extends State<PromotorAbonosScreen> {
                       ),
                     ),
                   );
+
+                // Si son AbonoPedido (del pedido específico), mostrar con _AbonoPedidoTile
+                if (abonosFiltrados.isNotEmpty && abonosFiltrados.first is AbonoPedido) {
+                  return Column(
+                    children: abonosFiltrados
+                        .map((abono) => _AbonoPedidoTile(abono: abono as AbonoPedido))
+                        .toList(),
+                  );
+                }
+
+                // Si son AbonoModel (abonos generales), mostrar con _AbonoTile
                 return Column(
-                  children:
-                      abonosFiltrados.map((abono) => _AbonoTile(abono: abono)).toList(),
+                  children: abonosFiltrados
+                      .map((abono) => _AbonoTile(abono: abono as AbonoModel))
+                      .toList(),
                 );
               }),
 
@@ -705,10 +733,81 @@ class _AbonoTile extends StatelessWidget {
                 Text(abono.clienteNombre,
                     style: const TextStyle(
                         fontSize: 14, fontWeight: FontWeight.w600)),
-                if (abono.observacion != null)
+                if (abono.pedidoId != null)
+                  Text('Pedido #${abono.pedidoId!.length > 6 ? abono.pedidoId!.substring(abono.pedidoId!.length - 6) : abono.pedidoId}',
+                      style: const TextStyle(
+                          fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.w500)),
+                if (abono.observacion != null && abono.observacion!.isNotEmpty)
                   Text(abono.observacion!,
                       style: const TextStyle(
                           fontSize: 12, color: AppTheme.textSecondary)),
+                Text(
+                  dateFmt.format(abono.fecha),
+                  style: const TextStyle(
+                      fontSize: 11, color: AppTheme.textSecondary),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            '+\$${fmt.format(abono.monto)}',
+            style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: AppTheme.success),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Tile de abono de pedido en el historial ─────────────────────────────────
+
+class _AbonoPedidoTile extends StatelessWidget {
+  final AbonoPedido abono;
+  const _AbonoPedidoTile({required this.abono});
+
+  @override
+  Widget build(BuildContext context) {
+    final fmt = NumberFormat('#,###', 'es_CO');
+    final dateFmt = DateFormat('dd MMM, HH:mm', 'es_CO');
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppTheme.success.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.payments_outlined,
+                color: AppTheme.success, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Abono a Pedido',
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  abono.tipo,
+                  style: const TextStyle(
+                      fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.w500),
+                ),
                 Text(
                   dateFmt.format(abono.fecha),
                   style: const TextStyle(

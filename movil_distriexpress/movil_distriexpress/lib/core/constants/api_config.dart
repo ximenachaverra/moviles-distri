@@ -14,4 +14,5 @@ class ApiConfig {
   static const String pedidos = '/api/pedidos';
   static const String abonos = '/api/abonos';
   static const String ruta = '/api/ruta';
+  static const String entregas = '/api/entregas';
 }

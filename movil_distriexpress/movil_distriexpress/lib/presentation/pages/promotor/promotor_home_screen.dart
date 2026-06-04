@@ -57,18 +57,6 @@ class _PromotorHomeScreenState extends State<PromotorHomeScreen> {
                   color: AppTheme.textPrimary)),
           RoleBadge(rol: user.rol),
         ]),
-        actions: [
-          IconButton(
-            icon:
-                const Icon(Icons.search_rounded, color: AppTheme.textPrimary),
-            onPressed: () {
-              showSearch(
-                context: context,
-                delegate: _ClienteSearchDelegate(state.clientes),
-              );
-            },
-          ),          
-        ],
       ),
       body: CustomScrollView(
         slivers: [
@@ -81,23 +69,56 @@ class _PromotorHomeScreenState extends State<PromotorHomeScreen> {
                   children: [
                     const Divider(height: 1, color: AppTheme.border),
                     const SizedBox(height: 16),
-                    Row(children: [
-                      const Icon(Icons.route_rounded,
-                          size: 16, color: AppTheme.primary),
-                      const SizedBox(width: 6),
-                      const Text('RUTA:',
-                          style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.textSecondary,
-                              letterSpacing: 0.5)),
-                      const SizedBox(width: 6),
-                      const Text('Ventas del norte',
-                          style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.primary)),
-                    ]),
+                    Consumer<AppState>(
+                      builder: (context, appState, _) {
+                        final ruta = appState.rutaActual;
+                        
+                        // Debug: Mostrar qué recibimos
+                        if (ruta != null) {
+                          debugPrint('[PromotorHome] Ruta recibida: ${ruta.keys.toList()}');
+                          debugPrint('[PromotorHome] Nombre ruta: ${ruta['nombre']}');
+                          debugPrint('[PromotorHome] ID ruta: ${ruta['id']}');
+                        }
+                        
+                        // Obtener nombre: 1) nombre del map, 2) zona, 3) id, 4) default
+                        String nombreRuta = 'Sin asignar';
+                        if (ruta != null && ruta is Map) {
+                          final nombre = ruta['nombre'];
+                          final zona = ruta['zona'];
+                          final id = ruta['id'];
+                          
+                          if (nombre != null && nombre.toString().trim().isNotEmpty) {
+                            nombreRuta = nombre.toString().trim();
+                          } else if (zona != null && zona.toString().trim().isNotEmpty) {
+                            nombreRuta = 'Zona ${zona.toString().trim()}';
+                          } else if (id != null) {
+                            nombreRuta = 'Ruta #${id.toString()}';
+                          }
+                        }
+                        
+                        return Row(children: [
+                          const Icon(Icons.route_rounded,
+                              size: 16, color: AppTheme.primary),
+                          const SizedBox(width: 6),
+                          const Text('RUTA:',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.textSecondary,
+                                  letterSpacing: 0.5)),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(nombreRuta,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.primary)),
+                          ),
+                        ]);
+                      },
+                    ),
                     const SizedBox(height: 16),
                     TextField(
                       controller: _searchCtrl,

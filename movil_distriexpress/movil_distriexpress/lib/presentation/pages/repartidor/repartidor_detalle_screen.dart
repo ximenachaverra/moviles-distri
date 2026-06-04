@@ -52,14 +52,35 @@ class _RepartidorDetalleScreenState extends State<RepartidorDetalleScreen> {
         content: Text('${widget.cliente.nombre} - ¿Realizó algún pago o abono?'),
         actions: [
           TextButton(
-            onPressed: () {
-              // No recibió abono, solo marcar atendido
-              context.read<AppState>().cambiarEstadoCliente(widget.cliente.id, EstadoCliente.atendido);
-              Navigator.pop(ctx);
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Entrega confirmada: ${widget.cliente.nombre}'), backgroundColor: AppTheme.success),
-              );
+            onPressed: () async {
+              // No recibió abono, marcar todos los pedidos como atendidos
+              final state = context.read<AppState>();
+              final pedidos = state.pedidosPorCliente(widget.cliente.id);
+              
+              try {
+                // Marcar cada pedido como atendido (actualizar estado_asignacion)
+                for (final pedido in pedidos) {
+                  await state.marcarPedidoAtendido(pedido.id);
+                }
+                
+                // Luego cambiar estado del cliente
+                await state.cambiarEstadoCliente(widget.cliente.id, EstadoCliente.atendido);
+                
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Entrega confirmada: ${widget.cliente.nombre}'), backgroundColor: AppTheme.success),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error al marcar entrega: $e'), backgroundColor: AppTheme.error),
+                  );
+                }
+              }
             },
             child: const Text('No'),
           ),
@@ -73,12 +94,30 @@ class _RepartidorDetalleScreenState extends State<RepartidorDetalleScreen> {
                   builder: (_) => AbonosScreen(
                     preselectedCliente: widget.cliente,
                     fromDelivery: true,
-                    onAbonoRegistered: () {
-                      context.read<AppState>().cambiarEstadoCliente(widget.cliente.id, EstadoCliente.atendido);
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Abono registrado. Entrega completada: ${widget.cliente.nombre}'), backgroundColor: AppTheme.success),
-                      );
+                    onAbonoRegistered: () async {
+                      // Marcar todos los pedidos como atendidos después de registrar abono
+                      final state = context.read<AppState>();
+                      final pedidos = state.pedidosPorCliente(widget.cliente.id);
+                      
+                      try {
+                        for (final pedido in pedidos) {
+                          await state.marcarPedidoAtendido(pedido.id);
+                        }
+                        await state.cambiarEstadoCliente(widget.cliente.id, EstadoCliente.atendido);
+                        
+                        if (mounted) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Abono registrado. Entrega completada: ${widget.cliente.nombre}'), backgroundColor: AppTheme.success),
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error al marcar entrega: $e'), backgroundColor: AppTheme.error),
+                          );
+                        }
+                      }
                     },
                   ),
                 ),
@@ -107,6 +146,12 @@ class _RepartidorDetalleScreenState extends State<RepartidorDetalleScreen> {
     final pedidos = state.pedidosPorCliente(widget.cliente.id);
     final totalAbonos = pedidos.fold(0.0, (s, p) => s + p.totalAbonado);
     final pedidoPrincipal = pedidos.isNotEmpty ? pedidos.first : null;
+    
+    // Obtener el cliente actualizado del estado (no usar widget.cliente que es estático)
+    final clienteActualizado = state.clientes.firstWhere(
+      (c) => c.id == widget.cliente.id,
+      orElse: () => widget.cliente,
+    );
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -535,7 +580,7 @@ class _RepartidorDetalleScreenState extends State<RepartidorDetalleScreen> {
                       ),
                     ),
                   ),
-                  if (widget.cliente.estado != EstadoCliente.atendido) ...[
+                  if (clienteActualizado.estado != EstadoCliente.atendido) ...[
                     const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton.icon(
@@ -931,8 +976,6 @@ class _EstadoBadge extends StatelessWidget {
         return AppTheme.warning;
       case EstadoPedido.enProceso:
         return AppTheme.primary;
-      case EstadoPedido.atendido:
-        return AppTheme.success;
       case EstadoPedido.pendientePorPago:
         return AppTheme.accentOrange;
       case EstadoPedido.pagado:

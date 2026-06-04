@@ -27,7 +27,6 @@ enum EstadoCliente {
 enum EstadoPedido {
   pendiente,
   enProceso,
-  atendido,
   pendientePorPago,
   pagado,
   anulado;
@@ -38,8 +37,6 @@ enum EstadoPedido {
         return 'Pendiente';
       case EstadoPedido.enProceso:
         return 'En proceso';
-      case EstadoPedido.atendido:
-        return 'Atendido';
       case EstadoPedido.pendientePorPago:
         return 'Pendiente por pago';
       case EstadoPedido.pagado:
@@ -53,8 +50,6 @@ enum EstadoPedido {
     switch (s) {
       case 'En proceso':
         return EstadoPedido.enProceso;
-      case 'Atendido':
-        return EstadoPedido.atendido;
       case 'Pendiente por pago':
         return EstadoPedido.pendientePorPago;
       case 'Pagado':
@@ -63,6 +58,84 @@ enum EstadoPedido {
         return EstadoPedido.anulado;
       default:
         return EstadoPedido.pendiente;
+    }
+  }
+}
+
+// Estado de asignación de entregas (anteriormente era "Atendido" en pedidos)
+enum EstadoAsignacionEntrega {
+  asignada,
+  enTransito,
+  atendida,
+  rechazada,
+  reprogramada;
+
+  String get label {
+    switch (this) {
+      case EstadoAsignacionEntrega.asignada:
+        return 'Asignada';
+      case EstadoAsignacionEntrega.enTransito:
+        return 'En tránsito';
+      case EstadoAsignacionEntrega.atendida:
+        return 'Atendida';
+      case EstadoAsignacionEntrega.rechazada:
+        return 'Rechazada';
+      case EstadoAsignacionEntrega.reprogramada:
+        return 'Reprogramada';
+    }
+  }
+
+  static EstadoAsignacionEntrega fromString(String s) {
+    switch (s) {
+      case 'En tránsito':
+        return EstadoAsignacionEntrega.enTransito;
+      case 'Atendida':
+        return EstadoAsignacionEntrega.atendida;
+      case 'Rechazada':
+        return EstadoAsignacionEntrega.rechazada;
+      case 'Reprogramada':
+        return EstadoAsignacionEntrega.reprogramada;
+      default:
+        return EstadoAsignacionEntrega.asignada;
+    }
+  }
+}
+
+// Estado de ruta (nuevo en esta refactorización)
+enum EstadoRuta {
+  pendiente,
+  enEntrega,
+  completada,
+  parcial,
+  cancelada;
+
+  String get label {
+    switch (this) {
+      case EstadoRuta.pendiente:
+        return 'Pendiente';
+      case EstadoRuta.enEntrega:
+        return 'En entrega';
+      case EstadoRuta.completada:
+        return 'Completada';
+      case EstadoRuta.parcial:
+        return 'Parcial';
+      case EstadoRuta.cancelada:
+        return 'Cancelada';
+    }
+  }
+
+  static EstadoRuta fromString(String s) {
+    switch (s) {
+      case 'En entrega':
+        return EstadoRuta.enEntrega;
+      case 'Completada':
+        return EstadoRuta.completada;
+      case 'Parcial':
+        return EstadoRuta.parcial;
+      case 'Cancelada':
+        return EstadoRuta.cancelada;
+      default:
+        return EstadoRuta.pendiente;
     }
   }
 }
@@ -268,6 +341,7 @@ class PedidoModel {
   DateTime? fechaEntrega;
   DateTime? fechaModificacion;
   EstadoPedido estado;
+  EstadoAsignacionEntrega? estadoAsignacion;
   String origen;
   String observaciones;
   List<AbonoPedido> abonosPedido;
@@ -284,6 +358,7 @@ class PedidoModel {
     this.fechaEntrega,
     this.fechaModificacion,
     this.estado = EstadoPedido.pendiente,
+    this.estadoAsignacion,
     this.origen = 'pedido',
     this.observaciones = '',
     List<AbonoPedido>? abonosPedido,
@@ -320,6 +395,9 @@ class PedidoModel {
           ? _toDate(json['fecha_entrega'])
           : null,
       estado: EstadoPedido.fromString((json['estado'] ?? '').toString()),
+      estadoAsignacion: json['estado_asignacion'] != null
+          ? EstadoAsignacionEntrega.fromString((json['estado_asignacion'] ?? '').toString())
+          : null,
       origen: (json['origen'] ?? 'pedido').toString(),
       observaciones: (json['observaciones'] ?? '').toString(),
       abonosPedido: abonos,
@@ -340,6 +418,7 @@ class AbonoModel {
   final double monto;
   final DateTime fecha;
   final String? observacion;
+  final String? pedidoId;
 
   AbonoModel({
     required this.id,
@@ -348,6 +427,7 @@ class AbonoModel {
     required this.monto,
     required this.fecha,
     this.observacion,
+    this.pedidoId,
   });
 
   factory AbonoModel.fromJson(Map<String, dynamic> json) => AbonoModel(
@@ -358,5 +438,6 @@ class AbonoModel {
         monto: _toDouble(json['monto']),
         fecha: _toDate(json['fecha']),
         observacion: (json['observacion'] ?? json['tipo'])?.toString(),
+        pedidoId: (json['pedido_id'] ?? json['pedidoId'])?.toString(),
       );
 }

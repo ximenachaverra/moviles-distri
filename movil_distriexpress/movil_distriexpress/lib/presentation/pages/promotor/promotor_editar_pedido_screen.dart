@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
@@ -762,7 +763,7 @@ class _ItemPedidoCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          // Cantidad
+          // Cantidad con entrada manual
           Container(
             decoration: BoxDecoration(
               border: Border.all(color: AppTheme.border),
@@ -777,11 +778,27 @@ class _ItemPedidoCard extends StatelessWidget {
                   padding: EdgeInsets.zero,
                 ),
                 Container(
-                  width: 40,
+                  width: 50,
                   alignment: Alignment.center,
-                  child: Text(
-                    '${item.cantidad}',
+                  child: TextField(
+                    textAlign: TextAlign.center,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    controller: TextEditingController(text: '${item.cantidad}')
+                      ..selection = TextSelection.fromPosition(
+                        TextPosition(offset: '${item.cantidad}'.length),
+                      ),
                     style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                    onChanged: (value) {
+                      if (value.isNotEmpty) {
+                        onCantidadChanged(int.tryParse(value) ?? item.cantidad);
+                      }
+                    },
                   ),
                 ),
                 IconButton(

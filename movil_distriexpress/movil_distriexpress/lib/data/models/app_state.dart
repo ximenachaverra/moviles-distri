@@ -22,6 +22,7 @@ class AppState extends ChangeNotifier {
   List<ProductoModel> _productos = [];
   List<PedidoModel> _pedidos = [];
   List<AbonoModel> _abonos = [];
+  Map<String, dynamic>? _rutaActual;
   bool _loading = false;
 
   UserModel? get currentUser => _currentUser;
@@ -29,8 +30,13 @@ class AppState extends ChangeNotifier {
   List<ProductoModel> get productos => _productos;
   List<PedidoModel> get pedidos => _pedidos;
   List<AbonoModel> get abonos => _abonos;
+  Map<String, dynamic>? get rutaActual => _rutaActual;
   bool get loading => _loading;
   String? get token => _token;
+
+  // Aliases para mejor claridad
+  Map<String, dynamic>? get rutaAsignada => _rutaActual;
+  Map<String, dynamic>? get entregaActual => _rutaActual; // Usa la ruta actual como referencia de entrega
 
   AppState() {
     // On app start (web) attempt to prefetch products so catalog is available
@@ -110,20 +116,97 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ── Password Recovery ──────────────────────────────────────────────────────
+  Future<bool> olvidePassword(String email) async {
+    try {
+      final response = await _dio.post(
+        '${ApiConfig.baseUrl}/api/auth/olvide-password',
+        data: {'email': email},
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error olvidePassword: $e');
+      return false;
+    }
+  }
+
+  Future<bool> verificarCodigo(String email, String codigo) async {
+    try {
+      final response = await _dio.post(
+        '${ApiConfig.baseUrl}/api/auth/verificar-codigo',
+        data: {'email': email, 'codigo': codigo},
+      );
+      return response.data['valido'] ?? false;
+    } catch (e) {
+      print('Error verificarCodigo: $e');
+      return false;
+    }
+  }
+
+  Future<bool> resetPassword(String email, String codigo, String nuevaPassword, String confirmarPassword) async {
+    try {
+      final response = await _dio.post(
+        '${ApiConfig.baseUrl}/api/auth/reset-password',
+        data: {
+          'email': email,
+          'codigo': codigo,
+          'nuevaPassword': nuevaPassword,
+          'confirmarPassword': confirmarPassword,
+        },
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error resetPassword: $e');
+      return false;
+    }
+  }
+
   Future<void> _cargarDatosIniciales() async {
+    // Determinar si es promotor/repartidor
+    final esPromotorORepartidor = _currentUser?.rol == UserRole.promotor || _currentUser?.rol == UserRole.repartidor;
+    
+    // ignore: avoid_print
+    print('[AppState] _cargarDatosIniciales - Rol: ${_currentUser?.rol}, Es promotor/repartidor: $esPromotorORepartidor');
+
+    // Obtener clientes según el rol
+    late Future<dynamic> clientesRequest;
+    if (esPromotorORepartidor) {
+      // ignore: avoid_print
+      print('[AppState] Obteniendo clientes de ruta asignada...');
+      clientesRequest = _dio.get(ApiConfig.ruta);
+    } else {
+      // ignore: avoid_print
+      print('[AppState] Obteniendo todos los clientes...');
+      clientesRequest = _dio.get(ApiConfig.clientes);
+    }
+
     final responses = await Future.wait([
-      _dio.get(ApiConfig.clientes),
+      clientesRequest,
       _dio.get(ApiConfig.productos),
       _dio.get(ApiConfig.pedidos),
       _dio.get(ApiConfig.abonos),
     ]);
 
-    final clientesJson = _asListMap(responses[0].data);
+    // Procesar clientes según el tipo de respuesta
+    late List<dynamic> clientesJson;
+    if (esPromotorORepartidor) {
+      // La respuesta es { ruta: {...}, clientes: [...] }
+      final rutaResponse = responses[0].data as Map<String, dynamic>;
+      clientesJson = (rutaResponse['clientes'] ?? []) as List<dynamic>;
+      // ignore: avoid_print
+      print('[AppState] Clientes cargados de ruta: ${clientesJson.length}');
+    } else {
+      // La respuesta es directamente una lista de clientes
+      clientesJson = _asListMap(responses[0].data);
+      // ignore: avoid_print
+      print('[AppState] Todos los clientes cargados: ${clientesJson.length}');
+    }
+
     final productosJson = _asListMap(responses[1].data);
     final pedidosJson = _asListMap(responses[2].data);
     final abonosJson = _asListMap(responses[3].data);
 
-    _clientes = clientesJson.map(ClienteModel.fromJson).toList();
+    _clientes = clientesJson.map((c) => ClienteModel.fromJson(c as Map<String, dynamic>)).toList();
     _productos = productosJson.map(ProductoModel.fromJson).toList();
     _abonos = abonosJson.map(AbonoModel.fromJson).toList();
 
@@ -168,19 +251,59 @@ class AppState extends ChangeNotifier {
   }
 
   /// Fetch clients from API and update local state.
+  /// Para promotores y repartidores, trae solo los clientes asignados a su ruta.
+  /// Para otros roles, trae todos los clientes.
   Future<void> fetchClientes() async {
     if (_token == null) return;
     try {
-      final response = await _dio.get(ApiConfig.clientes);
-      final clientesJson = _asListMap(response.data);
-      _clientes = clientesJson.map(ClienteModel.fromJson).toList();
+      // Debug: mostrar rol del usuario
+      // ignore: avoid_print
+      print('[AppState] fetchClientes - Rol actual: ${_currentUser?.rol} (${_currentUser?.rol.runtimeType})');
+      
+      // Si es promotor o repartidor, obtener su ruta asignada
+      if (_currentUser?.rol == UserRole.promotor || _currentUser?.rol == UserRole.repartidor) {
+        // ignore: avoid_print
+        print('[AppState] fetchClientes - Es promotor/repartidor, obteniendo ruta asignada...');
+        
+        final response = await _dio.get(ApiConfig.ruta);
+        final rutaData = response.data as Map<String, dynamic>;
+        
+        // ignore: avoid_print
+        print('[AppState] fetchClientes - Respuesta ruta: ${rutaData.keys.toList()}');
+        
+        // Guardar la ruta actual
+        _rutaActual = rutaData['ruta'] as Map<String, dynamic>?;
+        
+        // ignore: avoid_print
+        print('[AppState] fetchClientes - Ruta guardada: $_rutaActual');
+        print('[AppState] fetchClientes - Campos de ruta: ${_rutaActual?.keys.toList()}');
+        
+        // Si tiene ruta asignada, usar los clientes de la ruta
+        if (rutaData['clientes'] != null && rutaData['clientes'] is List) {
+          final clientesJson = _asListMap(rutaData['clientes']);
+          _clientes = clientesJson.map(ClienteModel.fromJson).toList();
+          // ignore: avoid_print
+          print('[AppState] fetchClientes (ruta) -> loaded ${_clientes.length} clientes asignados');
+        } else {
+          _clientes = [];
+          // ignore: avoid_print
+          print('[AppState] fetchClientes -> sin ruta asignada, devuelve lista vacía');
+        }
+      } else {
+        // Para otros roles, traer todos los clientes
+        // ignore: avoid_print
+        print('[AppState] fetchClientes - No es promotor/repartidor, obteniendo todos los clientes...');
+        
+        final response = await _dio.get(ApiConfig.clientes);
+        final clientesJson = _asListMap(response.data);
+        _clientes = clientesJson.map(ClienteModel.fromJson).toList();
+        // ignore: avoid_print
+        print('[AppState] fetchClientes -> loaded ${_clientes.length} clientes');
+      }
       notifyListeners();
-      // debug
+    } catch (e) {
       // ignore: avoid_print
-      print('[AppState] fetchClientes -> loaded ${_clientes.length} clientes');
-    } catch (_) {
-      // ignore: avoid_print
-      print('[AppState] fetchClientes failed');
+      print('[AppState] fetchClientes error: $e');
     }
   }
 
@@ -576,19 +699,22 @@ class AppState extends ChangeNotifier {
       _pedidos.where((p) => p.cliente.id == clienteId).toList();
 
   /// Recalcula el estado de un cliente basado en sus pedidos
-  /// - 'pendiente' si tiene algún pedido en progreso O no tiene pedidos
-  /// - 'atendido' si todos sus pedidos están en estado terminal (Pagado, Anulado, Atendido)
+  /// - 'pendiente' si tiene algún pedido que NO está en estado terminal
+  /// - 'atendido' si todos sus pedidos están en estado terminal (Pagado, Anulado) O en estado Atendida
   void _recalcularEstadoCliente(String clienteId) {
     final idx = _clientes.indexWhere((c) => c.id == clienteId);
     if (idx >= 0) {
       final pedidosDelCliente = pedidosPorCliente(clienteId);
       
       // Si no tiene pedidos o tiene pedidos que aún no están en estado terminal
+      // Un pedido está "completado" si:
+      // - Estado es Pagado O Anulado (estado de pago)
+      // - O estado_asignacion es Atendida (estado de entrega)
       final tienePedidosPendientes = pedidosDelCliente.isEmpty ||
           pedidosDelCliente.any((p) => 
             p.estado != EstadoPedido.pagado &&
             p.estado != EstadoPedido.anulado &&
-            p.estado != EstadoPedido.atendido
+            p.estadoAsignacion != EstadoAsignacionEntrega.atendida
           );
 
       final nuevoEstado = tienePedidosPendientes 
@@ -599,29 +725,32 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  /// Marca un pedido como "Atendido"
+  /// Marca un pedido como "Atendida" (actualiza estado_asignacion en entrega_pedidos)
+  /// Ahora usa el nuevo endpoint: POST /api/entregas/pedidos/:pedidoId/estado
   Future<void> marcarPedidoAtendido(String pedidoId) async {
     final idx = _pedidos.indexWhere((p) => p.id == pedidoId);
     if (idx >= 0) {
-      final estadoAnterior = _pedidos[idx].estado;
+      final estadoAnterior = _pedidos[idx].estadoAsignacion;
       final clienteId = _pedidos[idx].cliente.id;
       
-      // Actualizar localmente de inmediato
-      _pedidos[idx].estado = EstadoPedido.atendido;
+      // Actualizar localmente de inmediato (optimistic UI)
+      _pedidos[idx].estadoAsignacion = EstadoAsignacionEntrega.atendida;
       _recalcularEstadoCliente(clienteId); // Recalcular estado del cliente
       notifyListeners();
 
-      // Sincronizar con servidor
+      // Sincronizar con servidor usando el nuevo endpoint
       if (_token != null) {
         try {
           await _dio.patch(
-            '${ApiConfig.pedidos}/$pedidoId/estado',
+            '${ApiConfig.entregas}/pedidos/$pedidoId/estado',
+            data: {
+              'estado_asignacion': 'Atendida',
+            },
           );
-          // No llamar a fetchPedidos/fetchClientes para evitar conflictos de navegación
-          // El estado se actualiza localmente y la próxima vez que se abra una pantalla se sincronizará
+          // ✅ Éxito - el estado se actualizó correctamente
         } catch (e) {
           // Si falla, revertir el cambio local
-          _pedidos[idx].estado = estadoAnterior;
+          _pedidos[idx].estadoAsignacion = estadoAnterior;
           _recalcularEstadoCliente(clienteId); // Revertir estado del cliente
           notifyListeners();
           // ignore: avoid_print
@@ -629,6 +758,63 @@ class AppState extends ChangeNotifier {
           rethrow;
         }
       }
+    }
+  }
+
+  /// Marca un pedido como "Entregado" (actualiza estado de entrega)
+  /// Usado por repartidores para confirmar entrega
+  Future<void> marcarPedidoEntregado(String pedidoId) async {
+    final idx = _pedidos.indexWhere((p) => p.id == pedidoId);
+    if (idx >= 0) {
+      final estadoAnterior = _pedidos[idx].entregado;
+      final clienteId = _pedidos[idx].cliente.id;
+      
+      // Actualizar localmente de inmediato (optimistic UI)
+      _pedidos[idx].entregado = true;
+      _recalcularEstadoCliente(clienteId);
+      notifyListeners();
+
+      // Sincronizar con servidor
+      if (_token != null && _esIdDeApi(pedidoId)) {
+        try {
+          await _dio.patch(
+            '${ApiConfig.entregas}/pedidos/$pedidoId/entregado',
+            data: {'entregado': true},
+          );
+          // ✅ Éxito - el pedido se marcó como entregado
+        } catch (e) {
+          // Si falla, revertir el cambio local
+          _pedidos[idx].entregado = estadoAnterior;
+          _recalcularEstadoCliente(clienteId);
+          notifyListeners();
+          // ignore: avoid_print
+          print('[AppState] Error marcarPedidoEntregado: $e');
+          rethrow;
+        }
+      }
+    }
+  }
+
+  /// Marca un cliente como "Atendido en Ruta"
+  /// Combinación de marcar cliente atendido y actualizar estado de asignación
+  Future<void> marcarClienteAtendidoEnRuta(String clienteId) async {
+    try {
+      // 1. Cambiar estado del cliente a atendido
+      await cambiarEstadoCliente(clienteId, EstadoCliente.atendido);
+      
+      // 2. Marcar todos sus pedidos de esta ruta como atendidos
+      final pedidosCliente = pedidosPorCliente(clienteId);
+      for (final pedido in pedidosCliente) {
+        if (pedido.estadoAsignacion != EstadoAsignacionEntrega.atendida) {
+          await marcarPedidoAtendido(pedido.id);
+        }
+      }
+      
+      notifyListeners();
+    } catch (e) {
+      // ignore: avoid_print
+      print('[AppState] Error marcarClienteAtendidoEnRuta: $e');
+      rethrow;
     }
   }
 

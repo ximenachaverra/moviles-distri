@@ -2,6 +2,7 @@
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/app_state.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -87,7 +88,7 @@ class _LoginScreenState extends State<LoginScreen>
                     ),
                     const SizedBox(height: 4),
                     const Text(
-                      'GestiÃ³n de rutas y pedidos',
+                      'Gestión de rutas y pedidos',
                       style: TextStyle(
                         fontSize: 14,
                         color: AppTheme.textSecondary,
@@ -146,7 +147,10 @@ class _LoginScreenState extends State<LoginScreen>
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
-              onPressed: () {},
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
+              ),
               child: const Text(
                 '¿Olvidaste tu contraseña?',
                 style: TextStyle(fontSize: 13, color: AppTheme.primary),

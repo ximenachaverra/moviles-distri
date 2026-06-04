@@ -19,16 +19,21 @@ class ClienteCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: AppTheme.surface,
+          color: cliente.estado == EstadoCliente.atendido
+              ? AppTheme.success.withValues(alpha: 0.08)
+              : AppTheme.surface,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: cliente.estado == EstadoCliente.atendido
-                ? AppTheme.success.withValues(alpha: 0.4)
+                ? AppTheme.success.withValues(alpha: 0.3)
                 : AppTheme.border,
+            width: cliente.estado == EstadoCliente.atendido ? 1.5 : 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
+              color: cliente.estado == EstadoCliente.atendido
+                  ? AppTheme.success.withValues(alpha: 0.1)
+                  : Colors.black.withValues(alpha: 0.03),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -42,7 +47,7 @@ class ClienteCard extends StatelessWidget {
               height: 46,
               decoration: BoxDecoration(
                 color: cliente.estado == EstadoCliente.atendido
-                    ? AppTheme.success.withValues(alpha: 0.1)
+                    ? AppTheme.success.withValues(alpha: 0.15)
                     : AppTheme.primaryLight,
                 shape: BoxShape.circle,
               ),
@@ -89,19 +94,25 @@ class ClienteCard extends StatelessWidget {
             // Badge saldo / check
             if (cliente.estado == EstadoCliente.atendido)
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: AppTheme.success.withValues(alpha: 0.1),
+                  color: AppTheme.success,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Text(
-                  'Atendido',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: AppTheme.success,
-                    fontWeight: FontWeight.w600,
-                  ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.check_rounded, size: 14, color: Colors.white),
+                    SizedBox(width: 4),
+                    Text(
+                      'Entregado',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               )
             else if (cliente.saldoPendiente > 0)

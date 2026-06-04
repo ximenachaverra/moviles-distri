@@ -596,7 +596,6 @@ class _ClientePedidoCard extends StatelessWidget {
     switch (e) {
       case EstadoPedido.pendiente:        return AppTheme.warning;
       case EstadoPedido.enProceso:        return AppTheme.primary;
-      case EstadoPedido.atendido:         return AppTheme.success;
       case EstadoPedido.pendientePorPago: return AppTheme.accentOrange;
       case EstadoPedido.pagado:           return AppTheme.success;
       case EstadoPedido.anulado:          return AppTheme.error;
@@ -696,7 +695,6 @@ class _PedidoDetalleCard extends StatelessWidget {
     switch (pedido.estado) {
       case EstadoPedido.pendiente:        return AppTheme.warning;
       case EstadoPedido.enProceso:        return AppTheme.primary;
-      case EstadoPedido.atendido:         return AppTheme.success;
       case EstadoPedido.pendientePorPago: return AppTheme.accentOrange;
       case EstadoPedido.pagado:           return AppTheme.success;
       case EstadoPedido.anulado:          return AppTheme.error;
@@ -756,7 +754,7 @@ class _PedidoDetalleCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              Expanded(child: _InfoField(label: 'Hora pedido', value: DateFormat('HH:mm', 'es_CO').format(pedido.fecha))),
+              Expanded(child: _InfoField(label: 'Hora pedido', value: DateFormat('HH:mm', 'es_CO').format(pedido.fecha.subtract(const Duration(hours: 5))))),
             ]),
           ),
         ),
@@ -906,6 +904,10 @@ class _CrearPedidoScreenState extends State<CrearPedidoScreen> {
   final Map<String, int> _cantidades      = {};
   final Map<String, TextEditingController> _qtyCtrls = {};
   final NumberFormat _moneyFmt = NumberFormat('#,###', 'es_CO');
+  
+  // ── Paginación ────────────────────────────────────────────────────────
+  int _paginaActual = 0;
+  final int _productosPerPage = 6;
 
   DateTime? _fechaEntrega;
   String _tipoAbono   = 'Efectivo';
@@ -1035,6 +1037,60 @@ class _CrearPedidoScreenState extends State<CrearPedidoScreen> {
     Navigator.pop(context, resumenPedido);
   }
 
+  // Método para obtener productos de la página actual
+  List<ProductoModel> _productosEnPagina(List<ProductoModel> productos) {
+    final inicio = _paginaActual * _productosPerPage;
+    final fin = (inicio + _productosPerPage).clamp(0, productos.length);
+    return productos.sublist(inicio, fin);
+  }
+
+  // Método para construir los controles de paginación
+  Widget _buildPaginationControls(List<ProductoModel> productos) {
+    final totalPaginas = (productos.length / _productosPerPage).ceil();
+    final paginaActualDisplay = _paginaActual + 1;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Botón anterior
+          IconButton(
+            icon: const Icon(Icons.chevron_left_rounded),
+            onPressed: _paginaActual > 0
+                ? () => setState(() => _paginaActual--)
+                : null,
+            tooltip: 'Página anterior',
+          ),
+          const SizedBox(width: 8),
+          // Indicador de página
+          Text(
+            'Página $paginaActualDisplay de $totalPaginas',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Botón siguiente
+          IconButton(
+            icon: const Icon(Icons.chevron_right_rounded),
+            onPressed: _paginaActual < (totalPaginas - 1)
+                ? () => setState(() => _paginaActual++)
+                : null,
+            tooltip: 'Página siguiente',
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final state   = context.watch<AppState>();
@@ -1074,7 +1130,7 @@ class _CrearPedidoScreenState extends State<CrearPedidoScreen> {
           // ── Buscador ──────────────────────────────────────────────────────
           TextField(
             controller: _buscarCtrl,
-            onChanged: (_) => setState(() {}),
+            onChanged: (_) => setState(() => _paginaActual = 0),
             decoration: const InputDecoration(
               labelText: 'Buscar producto',
               prefixIcon: Icon(Icons.search_rounded),
@@ -1115,11 +1171,15 @@ class _CrearPedidoScreenState extends State<CrearPedidoScreen> {
           Expanded(
             child: productos.isEmpty
                 ? const Center(child: Text('No hay productos para mostrar'))
-                : ListView.separated(
-                    itemCount: productos.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (_, i) {
-                      final p       = productos[i];
+                : Column(
+                    children: [
+                      // Productos paginados
+                      Expanded(
+                        child: ListView.separated(
+                          itemCount: _productosEnPagina(productos).length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 8),
+                          itemBuilder: (_, i) {
+                            final p       = _productosEnPagina(productos)[i];
                       final cantidad = _cantidades[p.id] ?? 0;
 
                       return Container(
@@ -1228,6 +1288,12 @@ class _CrearPedidoScreenState extends State<CrearPedidoScreen> {
                         ]),
                       );
                     },
+                  ),
+                      ),
+                      // Controles de paginación
+                      const SizedBox(height: 12),
+                      _buildPaginationControls(productos),
+                    ],
                   ),
           ),
 

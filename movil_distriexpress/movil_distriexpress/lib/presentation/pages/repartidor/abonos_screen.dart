@@ -25,6 +25,7 @@ class AbonosScreen extends StatefulWidget {
 
 class _AbonosScreenState extends State<AbonosScreen> {
   String? _selectedClienteId;
+  String? _selectedPedidoId;
   final _montoController = TextEditingController();
   final _obsController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
@@ -79,12 +80,39 @@ class _AbonosScreenState extends State<AbonosScreen> {
     await Future.delayed(const Duration(milliseconds: 500));
     if (!mounted) return;
 
-    await context.read<AppState>().registrarAbono(
-          selectedCliente.id,
-          selectedCliente.nombre,
-          monto,
-          _obsController.text.trim().isEmpty ? null : _obsController.text.trim(),
+    // Si hay un pedido seleccionado, usar agregarAbonoPedido
+    if (_selectedPedidoId != null && _selectedPedidoId!.isNotEmpty) {
+      try {
+        final pedidoSeleccionado =
+            state.pedidos.firstWhere((p) => p.id == _selectedPedidoId);
+        await state.agregarAbonoPedido(
+          pedidoSeleccionado.id,
+          AbonoPedido(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            monto: monto,
+            tipo: 'Efectivo',
+            fecha: DateTime.now(),
+          ),
         );
+      } catch (e) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al registrar abono: $e'),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+        return;
+      }
+    } else {
+      // Si no hay pedido seleccionado, usar registrarAbono (abono general)
+      await context.read<AppState>().registrarAbono(
+            selectedCliente.id,
+            selectedCliente.nombre,
+            monto,
+            _obsController.text.trim().isEmpty ? null : _obsController.text.trim(),
+          );
+    }
 
     if (!mounted) return;
 
@@ -92,6 +120,7 @@ class _AbonosScreenState extends State<AbonosScreen> {
       _saving = false;
       _montoController.clear();
       _obsController.clear();
+      _selectedPedidoId = null;
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -125,7 +154,7 @@ class _AbonosScreenState extends State<AbonosScreen> {
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: const Text('MÃ³dulo de Abonos'),
+        title: const Text('Mòdulo de Abonos'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_rounded),
           onPressed: () => Navigator.pop(context),
@@ -303,10 +332,118 @@ class _AbonosScreenState extends State<AbonosScreen> {
                                   .toList(),
                               onChanged: (c) => setState(() {
                                 _selectedClienteId = c?.id;
+                                _selectedPedidoId = null;
                               }),
                             ),
                           ),
                         ),
+                      // Pedido selector (si hay cliente seleccionado con múltiples pedidos)
+                      if (selectedCliente != null)
+                        Builder(builder: (context) {
+                          // Filtrar pedidos del cliente con saldo pendiente
+                          final pedidosDelCliente = state.pedidos
+                              .where((p) =>
+                                  p.cliente.id == selectedCliente.id &&
+                                  p.saldoPendiente > 0)
+                              .toList();
+
+                          // Eliminar duplicados por ID
+                          final pedidosUnicos = <String, PedidoModel>{};
+                          for (var p in pedidosDelCliente) {
+                            pedidosUnicos[p.id] = p;
+                          }
+                          pedidosDelCliente.clear();
+                          pedidosDelCliente.addAll(pedidosUnicos.values);
+
+                          if (pedidosDelCliente.isNotEmpty) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 14),
+                                const Text(
+                                  'Pedido (opcional)',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.textSecondary,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.background,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: AppTheme.border),
+                                  ),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<String>(
+                                      value: _selectedPedidoId,
+                                      hint: const Padding(
+                                        padding: EdgeInsets.symmetric(horizontal: 16),
+                                        child: Text('Seleccionar pedido específico',
+                                            style: TextStyle(
+                                                color: AppTheme.textSecondary,
+                                                fontSize: 14)),
+                                      ),
+                                      isExpanded: true,
+                                      padding:
+                                          const EdgeInsets.symmetric(horizontal: 12),
+                                      borderRadius: BorderRadius.circular(12),
+                                      items: pedidosDelCliente
+                                          .map(
+                                            (p) => DropdownMenuItem(
+                                              value: p.id,
+                                              child: Row(
+                                                children: [
+                                                  const Icon(
+                                                      Icons
+                                                          .receipt_long_rounded,
+                                                      size: 16,
+                                                      color: AppTheme
+                                                          .textSecondary),
+                                                  const SizedBox(width: 8),
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      children: [
+                                                        Text(
+                                                          'Pedido #${p.id.length > 6 ? p.id.substring(p.id.length - 6) : p.id}',
+                                                          style: const TextStyle(
+                                                              fontSize: 14,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w600),
+                                                        ),
+                                                        Text(
+                                                          'Total: \$${fmt.format(p.total)} | Saldo: \$${fmt.format(p.saldoPendiente)}',
+                                                          style: const TextStyle(
+                                                              fontSize: 11,
+                                                              color: AppTheme
+                                                                  .textSecondary),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          )
+                                          .toList(),
+                                      onChanged: (p) =>
+                                          setState(() =>
+                                              _selectedPedidoId = p),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          }
+                          return const SizedBox.shrink();
+                        }),
                       // Saldo info
                       if (selectedCliente != null &&
                           state.calcularSaldoPendienteCliente(selectedCliente.id) > 0) ...[
@@ -537,6 +674,9 @@ class _AbonoTile extends StatelessWidget {
                 Text(abono.clienteNombre,
                     style: const TextStyle(
                         fontSize: 14, fontWeight: FontWeight.w600)),
+                if (abono.pedidoId != null)
+                  Text('Pedido #${abono.pedidoId!.length > 6 ? abono.pedidoId!.substring(abono.pedidoId!.length - 6) : abono.pedidoId}',
+                      style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.w500)),
                 if (abono.observacion != null)
                   Text(abono.observacion!,
                       style: const TextStyle(
