@@ -233,11 +233,20 @@ class _PromotorHomeScreenState extends State<PromotorHomeScreen> {
                   final cliente = clientesFiltrados[index];
                   return ClienteCard(
                     cliente: cliente,
-                    onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) =>
-                                PromotorDetalleScreen(cliente: cliente))),
+                    onTap: () => Navigator.push<String>(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) =>
+                              PromotorDetalleScreen(cliente: cliente)),
+                    ).then((result) {
+                      if (result == 'atendido' && context.mounted) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const PromotorPedidosScreen()),
+                        );
+                      }
+                    }),
                   );
                 },
                 childCount: clientesFiltrados.length,

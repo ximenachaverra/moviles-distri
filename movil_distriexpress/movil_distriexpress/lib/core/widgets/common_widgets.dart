@@ -8,8 +8,14 @@ import 'package:intl/intl.dart';
 class ClienteCard extends StatelessWidget {
   final ClienteModel cliente;
   final VoidCallback onTap;
+  final Function(bool)? onToggleAtendido;
 
-  const ClienteCard({super.key, required this.cliente, required this.onTap});
+  const ClienteCard({
+    super.key,
+    required this.cliente,
+    required this.onTap,
+    this.onToggleAtendido,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -91,7 +97,7 @@ class ClienteCard extends StatelessWidget {
                 ],
               ),
             ),
-            // Badge saldo / check
+            // Badge saldo / check / toggle button
             if (cliente.estado == EstadoCliente.atendido)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -99,21 +105,40 @@ class ClienteCard extends StatelessWidget {
                   color: AppTheme.success,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.check_rounded, size: 14, color: Colors.white),
-                    SizedBox(width: 4),
-                    Text(
-                      'Entregado',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
+                child: onToggleAtendido != null
+                    ? GestureDetector(
+                        onTap: () => onToggleAtendido!(false),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.check_rounded, size: 14, color: Colors.white),
+                            SizedBox(width: 4),
+                            Text(
+                              'Atendido',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.check_rounded, size: 14, color: Colors.white),
+                          SizedBox(width: 4),
+                          Text(
+                            'Atendido',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
-                ),
               )
             else if (cliente.saldoPendiente > 0)
               Container(
@@ -129,6 +154,35 @@ class ClienteCard extends StatelessWidget {
                     fontSize: 11,
                     color: AppTheme.warning,
                     fontWeight: FontWeight.w600,
+                  ),
+                ),
+              )
+            else if (onToggleAtendido != null)
+              GestureDetector(
+                onTap: () => onToggleAtendido!(true),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.promotorColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: AppTheme.promotorColor.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.radio_button_unchecked, size: 14, color: AppTheme.promotorColor),
+                      SizedBox(width: 4),
+                      Text(
+                        'Marcar',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.promotorColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               )

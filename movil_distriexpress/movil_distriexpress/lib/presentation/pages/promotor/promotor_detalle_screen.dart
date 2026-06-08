@@ -417,88 +417,67 @@ class _PromotorDetalleScreenState extends State<PromotorDetalleScreen> {
               ),
               child: SizedBox(
                 width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: widget.cliente.estado == EstadoCliente.atendido
-                      ? null
-                      : () {
-                          showDialog(
-                            context: context,
-                            builder: (ctx) => AlertDialog(
-                              title: const Text('¿Recibió abono?'),
-                              content: Text(
-                                '${widget.cliente.nombre} - ¿Recibió un abono en esta atención?',
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () {
-                                    Navigator.pop(ctx);
-                                    context.read<AppState>().cambiarEstadoCliente(widget.cliente.id, EstadoCliente.atendido);
-                                    Navigator.pop(context);
-                                  },
-                                  child: const Text('No'),
-                                ),
-                                ElevatedButton(
-                                  onPressed: () {
-                                    final pedidosCliente = context.read<AppState>().pedidosPorCliente(widget.cliente.id);
-                                    final pedidoPendiente = pedidosCliente
-                                        .where((p) => p.saldoPendiente > 0)
-                                        .cast<PedidoModel?>()
-                                        .firstWhere(
-                                          (p) => p != null,
-                                          orElse: () => pedidosCliente.isNotEmpty ? pedidosCliente.first : null,
-                                        );
-
-                                    if (pedidoPendiente == null) {
-                                      Navigator.pop(ctx);
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('No hay pedidos para registrar abono'),
-                                          backgroundColor: AppTheme.error,
-                                        ),
-                                      );
-                                      return;
-                                    }
-
-                                    Navigator.pop(ctx);
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => PromotorAbonosScreen(
-                                          preselectedCliente: widget.cliente,
-                                          fromDelivery: true,
-                                          fixedPedidoId: pedidoPendiente.id,
-                                          onAbonoRegistered: () {
-                                            context.read<AppState>().cambiarEstadoCliente(widget.cliente.id, EstadoCliente.atendido);
-                                            Navigator.pop(context);
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              SnackBar(
-                                                content: Text('Abono registrado. ${widget.cliente.nombre} marcado como atendido'),
-                                                backgroundColor: AppTheme.success,
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.promotorColor),
-                                  child: const Text('Sí'),
-                                ),
-                              ],
-                            ),
+                child: Consumer<AppState>(
+                  builder: (context, appState, _) {
+                    final clienteActualizado = appState.clientes.firstWhere(
+                      (c) => c.id == widget.cliente.id,
+                      orElse: () => widget.cliente,
+                    );
+                    final esAtendido = clienteActualizado.estado == EstadoCliente.atendido;
+                    
+                    return ElevatedButton.icon(
+                      onPressed: () async {
+                        try {
+                          await appState.toggleAtendidoCliente(
+                            widget.cliente.id,
+                            !esAtendido,
                           );
-                        },
-                  icon: Icon(
-                    widget.cliente.estado == EstadoCliente.atendido ? Icons.check_circle : Icons.check_rounded,
-                    size: 18,
-                  ),
-                  label: Text(widget.cliente.estado == EstadoCliente.atendido ? 'Atendido ✓' : 'ATENDIDO'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: widget.cliente.estado == EstadoCliente.atendido
-                        ? AppTheme.success
-                        : AppTheme.promotorColor,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
+                          
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  !esAtendido 
+                                    ? '${widget.cliente.nombre} marcado como atendido' 
+                                    : '${widget.cliente.nombre} marcado como pendiente'
+                                ),
+                                backgroundColor: AppTheme.success,
+                              ),
+                            );
+                            
+                            if (!esAtendido) {
+                              // Si se marcó como atendido, volver atrás y señalizar para ir a pedidos
+                              Future.delayed(const Duration(milliseconds: 800), () {
+                                if (context.mounted) {
+                                  Navigator.pop(context, 'atendido');
+                                }
+                              });
+                            }
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Error al actualizar estado: $e'),
+                                backgroundColor: AppTheme.error,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      icon: Icon(
+                        esAtendido ? Icons.check_circle : Icons.check_rounded,
+                        size: 18,
+                      ),
+                      label: Text(esAtendido ? 'Atendido ✓' : 'ATENDIDO'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: esAtendido
+                            ? AppTheme.success
+                            : AppTheme.promotorColor,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),

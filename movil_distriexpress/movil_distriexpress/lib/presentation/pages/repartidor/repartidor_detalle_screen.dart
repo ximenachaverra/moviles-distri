@@ -43,94 +43,6 @@ class _RepartidorDetalleScreenState extends State<RepartidorDetalleScreen> {
     }
   }
 
-  void _marcarEntregado() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('¿Recibió abono?'),
-        content: Text('${widget.cliente.nombre} - ¿Realizó algún pago o abono?'),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              // No recibió abono, marcar todos los pedidos como atendidos
-              final state = context.read<AppState>();
-              final pedidos = state.pedidosPorCliente(widget.cliente.id);
-              
-              try {
-                // Marcar cada pedido como atendido (actualizar estado_asignacion)
-                for (final pedido in pedidos) {
-                  await state.marcarPedidoAtendido(pedido.id);
-                }
-                
-                // Luego cambiar estado del cliente
-                await state.cambiarEstadoCliente(widget.cliente.id, EstadoCliente.atendido);
-                
-                if (mounted) {
-                  Navigator.pop(ctx);
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Entrega confirmada: ${widget.cliente.nombre}'), backgroundColor: AppTheme.success),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error al marcar entrega: $e'), backgroundColor: AppTheme.error),
-                  );
-                }
-              }
-            },
-            child: const Text('No'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              // Ir a pantalla de abonos con cliente preseleccionado
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => AbonosScreen(
-                    preselectedCliente: widget.cliente,
-                    fromDelivery: true,
-                    onAbonoRegistered: () async {
-                      // Marcar todos los pedidos como atendidos después de registrar abono
-                      final state = context.read<AppState>();
-                      final pedidos = state.pedidosPorCliente(widget.cliente.id);
-                      
-                      try {
-                        for (final pedido in pedidos) {
-                          await state.marcarPedidoAtendido(pedido.id);
-                        }
-                        await state.cambiarEstadoCliente(widget.cliente.id, EstadoCliente.atendido);
-                        
-                        if (mounted) {
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Abono registrado. Entrega completada: ${widget.cliente.nombre}'), backgroundColor: AppTheme.success),
-                          );
-                        }
-                      } catch (e) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error al marcar entrega: $e'), backgroundColor: AppTheme.error),
-                          );
-                        }
-                      }
-                    },
-                  ),
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.repartidorColor),
-            child: const Text('Sí'),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _verDetallePedido(PedidoModel pedido) {
     showModalBottomSheet(
       context: context,
@@ -580,17 +492,70 @@ class _RepartidorDetalleScreenState extends State<RepartidorDetalleScreen> {
                       ),
                     ),
                   ),
-                  if (clienteActualizado.estado != EstadoCliente.atendido) ...[
+                  if (clienteActualizado.estado != EstadoCliente.atendido && pedidoPrincipal != null) ...[
                     const SizedBox(width: 12),
                     Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _marcarEntregado,
-                        icon: const Icon(Icons.check_rounded, size: 18),
-                        label: const Text('Entregado'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.repartidorColor,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
+                      child: Consumer<AppState>(
+                        builder: (context, appState, _) {
+                          final pedidoActualizado = appState.pedidos.firstWhere(
+                            (p) => p.id == pedidoPrincipal!.id,
+                            orElse: () => pedidoPrincipal!,
+                          );
+                          final esEntregado = pedidoActualizado.entregado ?? false;
+
+                          return ElevatedButton.icon(
+                            onPressed: () async {
+                              try {
+                                await appState.toggleEntregadoPedido(
+                                  pedidoPrincipal!.id,
+                                  !esEntregado,
+                                );
+
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        !esEntregado
+                                            ? 'Pedido marcado como entregado'
+                                            : 'Pedido marcado como pendiente',
+                                      ),
+                                      backgroundColor: AppTheme.success,
+                                    ),
+                                  );
+
+                                  if (!esEntregado) {
+                                    // Si se marcó como entregado, volver atrás después de 1 segundo
+                                    Future.delayed(const Duration(milliseconds: 800), () {
+                                      if (context.mounted) {
+                                        Navigator.pop(context);
+                                      }
+                                    });
+                                  }
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Error al actualizar estado: $e'),
+                                      backgroundColor: AppTheme.error,
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                            icon: Icon(
+                              esEntregado ? Icons.check_circle : Icons.check_rounded,
+                              size: 18,
+                            ),
+                            label: Text(esEntregado ? 'Entregado ✓' : 'Entregado'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: esEntregado
+                                  ? AppTheme.success
+                                  : AppTheme.repartidorColor,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ],

@@ -192,8 +192,10 @@ class AppState extends ChangeNotifier {
     if (esPromotorORepartidor) {
       // La respuesta es { ruta: {...}, clientes: [...] }
       final rutaResponse = responses[0].data as Map<String, dynamic>;
+      _rutaActual = rutaResponse['ruta'] as Map<String, dynamic>?;
       clientesJson = (rutaResponse['clientes'] ?? []) as List<dynamic>;
       // ignore: avoid_print
+      print('[AppState] Ruta guardada: $_rutaActual');
       print('[AppState] Clientes cargados de ruta: ${clientesJson.length}');
     } else {
       // La respuesta es directamente una lista de clientes
@@ -795,26 +797,99 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  /// Marca un cliente como "Atendido en Ruta"
-  /// Combinación de marcar cliente atendido y actualizar estado de asignación
-  Future<void> marcarClienteAtendidoEnRuta(String clienteId) async {
+  /// Marca un cliente como atendido en una ruta (Promotor)
+  /// Llama a: PATCH /api/rutas/:rutaId/clientes/:clienteId/atendido
+  /// Optimistic update inmediato + sincronización con servidor
+  Future<void> marcarClienteAtendidoEnRuta(int rutaId, int clienteId, bool atendido) async {
+    // Actualización optimista: cambiar el estado local inmediatamente
+    final idx = _clientes.indexWhere((c) => c.id == clienteId.toString());
+    final estadoAnterior = idx >= 0 ? _clientes[idx].estado : null;
+    if (idx >= 0) {
+      _clientes[idx].estado = atendido ? EstadoCliente.atendido : EstadoCliente.pendiente;
+      notifyListeners();
+    }
+
     try {
-      // 1. Cambiar estado del cliente a atendido
-      await cambiarEstadoCliente(clienteId, EstadoCliente.atendido);
-      
-      // 2. Marcar todos sus pedidos de esta ruta como atendidos
-      final pedidosCliente = pedidosPorCliente(clienteId);
-      for (final pedido in pedidosCliente) {
-        if (pedido.estadoAsignacion != EstadoAsignacionEntrega.atendida) {
-          await marcarPedidoAtendido(pedido.id);
-        }
-      }
-      
+      await _dio.patch(
+        '${ApiConfig.baseUrl}/api/rutas/$rutaId/clientes/$clienteId/atendido',
+        data: {'atendido': atendido},
+      );
+
+      // Sincronizar con servidor para obtener estado real (incluyendo rutas.estado)
+      await fetchClientes();
       notifyListeners();
     } catch (e) {
-      // ignore: avoid_print
-      print('[AppState] Error marcarClienteAtendidoEnRuta: $e');
+      // Revertir si falló
+      if (idx >= 0 && estadoAnterior != null) {
+        _clientes[idx].estado = estadoAnterior;
+        notifyListeners();
+      }
+      print('[AppState] ❌ Error marcarClienteAtendidoEnRuta: $e');
       rethrow;
+    }
+  }
+
+  /// Alias: Marca cliente como atendido/pendiente en su ruta actual
+  /// Usado por promotores en el detalle de cliente
+  /// Parámetros:
+  /// - clienteId: ID del cliente a marcar
+  /// - estado: true=atendido, false=pendiente
+  Future<void> toggleAtendidoCliente(String clienteId, bool estado) async {
+    // Debug
+    print('[AppState] toggleAtendidoCliente - START');
+    print('[AppState] toggleAtendidoCliente - rutaActual: $_rutaActual');
+    print('[AppState] toggleAtendidoCliente - rutaActual tipo: ${_rutaActual?.runtimeType}');
+    print('[AppState] toggleAtendidoCliente - rutaActual keys: ${_rutaActual?.keys.toList()}');
+    
+    if (_rutaActual == null) {
+      print('[AppState] ❌ No hay ruta asignada');
+      print('[AppState] ⚠️ Intenta llamar a fetchClientes() nuevamente...');
+      // Intentar obtener la ruta nuevamente
+      try {
+        await fetchClientes();
+        print('[AppState] ✓ fetchClientes() completado, rutaActual ahora: $_rutaActual');
+      } catch (e) {
+        print('[AppState] ❌ fetchClientes() error: $e');
+      }
+      
+      if (_rutaActual == null) {
+        throw Exception('No hay ruta asignada. Verifica que tu promotor tenga una ruta asignada en la web.');
+      }
+    }
+    
+    final rutaId = _rutaActual!['id'];
+    if (rutaId == null) {
+      throw Exception('ID de ruta inválido');
+    }
+    
+    final rutaIdInt = int.tryParse(rutaId.toString()) ?? 0;
+    if (rutaIdInt == 0) {
+      throw Exception('ID de ruta no es válido');
+    }
+    
+    final clienteIdInt = int.tryParse(clienteId) ?? 0;
+    if (clienteIdInt == 0) {
+      throw Exception('ID de cliente inválido');
+    }
+    
+    print('[AppState] 🔄 toggleAtendidoCliente - rutaId: $rutaIdInt, clienteId: $clienteIdInt, estado: $estado');
+    
+    await marcarClienteAtendidoEnRuta(rutaIdInt, clienteIdInt, estado);
+  }
+
+  /// Alias: Marca pedido como entregado/pendiente
+  /// Usado por repartidores en el detalle de pedido
+  /// Parámetros:
+  /// - pedidoId: ID del pedido
+  /// - entregado: true=entregado, false=pendiente
+  Future<void> toggleEntregadoPedido(String pedidoId, bool entregado) async {
+    if (entregado) {
+      // Si es true, marcar como entregado
+      await marcarPedidoEntregado(pedidoId);
+    } else {
+      // Si es false, revertir (es más complejo, por ahora solo marca como atendido)
+      // Este es un placeholder - en producción habría un endpoint para revertir
+      print('[AppState] ⚠️  toggleEntregadoPedido(false) aún no implementado');
     }
   }
 
