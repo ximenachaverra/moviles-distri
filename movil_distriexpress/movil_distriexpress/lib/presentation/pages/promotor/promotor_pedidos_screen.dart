@@ -931,8 +931,12 @@ class _CrearPedidoScreenState extends State<CrearPedidoScreen> {
     final cantidad = value < 0 ? 0 : value;
     setState(() {
       if (cantidad == 0) _cantidades.remove(id); else _cantidades[id] = cantidad;
-      _controllerFor(id).text = '$cantidad';
     });
+    // Actualizar controller FUERA de setState para no interferir con el IME
+    _controllerFor(id).value = TextEditingValue(
+      text: '$cantidad',
+      selection: TextSelection.collapsed(offset: '$cantidad'.length),
+    );
   }
 
   void _sumar(String id)          => _setCantidad(id, (_cantidades[id] ?? 0) + 1);
@@ -977,7 +981,7 @@ class _CrearPedidoScreenState extends State<CrearPedidoScreen> {
     });
   }
 
-  void _guardarPedido(AppState state, double total) {
+  Future<void> _guardarPedido(AppState state, double total) async {
     final seleccionados = state.productos
         .where((p) => (_cantidades[p.id] ?? 0) > 0)
         .map((p) => ProductoModel(
@@ -995,7 +999,6 @@ class _CrearPedidoScreenState extends State<CrearPedidoScreen> {
           .showSnackBar(const SnackBar(content: Text('Debes establecer la fecha de entrega')));
       return;
     }
-    // Validación adicional: fechaEntrega no puede ser anterior a hoy
     final today = DateTime.now();
     final fechaOnly = DateTime(_fechaEntrega!.year, _fechaEntrega!.month, _fechaEntrega!.day);
     final todayOnly = DateTime(today.year, today.month, today.day);
@@ -1010,13 +1013,6 @@ class _CrearPedidoScreenState extends State<CrearPedidoScreen> {
             monto: total, tipo: _tipoAbono, fecha: DateTime.now())]
         : (_abonos.isEmpty ? null : _abonos);
 
-    state.guardarPedido(widget.cliente.id, seleccionados,
-        fechaEntrega: _fechaEntrega, abonos: abonosGuardar);
-
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('Pedido guardado correctamente')));
-    
-    // Retornar datos del pedido para mostrar resumen en pantalla anterior
     final abonado = abonosGuardar?.fold<double>(0, (sum, a) => sum + a.monto) ?? 0;
     final saldo = total - abonado;
     final resumenPedido = <String, dynamic>{
@@ -1033,8 +1029,47 @@ class _CrearPedidoScreenState extends State<CrearPedidoScreen> {
         'monto': a.monto,
       }).toList() ?? [],
     };
-    
-    Navigator.pop(context, resumenPedido);
+
+    try {
+      await state.guardarPedido(
+        widget.cliente.id,
+        seleccionados,
+        fechaEntrega: _fechaEntrega,
+        abonos: abonosGuardar,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pedido guardado correctamente'),
+          backgroundColor: AppTheme.success,
+        ),
+      );
+      Navigator.pop(context, resumenPedido);
+    } catch (e) {
+      if (!mounted) return;
+      // Extraer mensaje del error del servidor si está disponible
+      String mensajeError = 'Error al guardar el pedido';
+      final errorStr = e.toString();
+      if (errorStr.contains('Stock insuficiente') || errorStr.contains('stock')) {
+        mensajeError = errorStr.replaceAll('DioException [bad response]:', '').trim();
+      } else if (errorStr.contains('400') || errorStr.contains('Bad Request')) {
+        mensajeError = 'Datos inválidos. Verifica los productos y cantidades.';
+      } else if (errorStr.contains('401') || errorStr.contains('403')) {
+        mensajeError = 'Sin autorización. Vuelve a iniciar sesión.';
+      } else if (errorStr.contains('500')) {
+        mensajeError = 'Error en el servidor. Intenta de nuevo.';
+      } else if (errorStr.contains('SocketException') || errorStr.contains('connection')) {
+        mensajeError = 'Sin conexión al servidor. Verifica tu red.';
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(mensajeError),
+          backgroundColor: AppTheme.error,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
   }
 
   // Método para obtener productos de la página actual
@@ -1246,7 +1281,7 @@ class _CrearPedidoScreenState extends State<CrearPedidoScreen> {
                                 const SizedBox(width: 6),
                                 // Campo cantidad
                                 Container(
-                                  width: 60, height: 30,
+                                  width: 80, height: 32,
                                   alignment: Alignment.center,
                                   decoration: BoxDecoration(
                                     border: Border.all(color: AppTheme.border),
@@ -1266,7 +1301,23 @@ class _CrearPedidoScreenState extends State<CrearPedidoScreen> {
                                       fontWeight: FontWeight.w700,
                                       color: cantidad > 0 ? AppTheme.primary : AppTheme.textSecondary,
                                     ),
-                                    onChanged: (v) => _setCantidad(p.id, int.tryParse(v) ?? 0),
+                                    onTap: () {
+                                      final ctrl = _controllerFor(p.id);
+                                      ctrl.selection = TextSelection(
+                                        baseOffset: 0,
+                                        extentOffset: ctrl.text.length,
+                                      );
+                                    },
+                                    onChanged: (v) {
+                                      final val = int.tryParse(v) ?? 0;
+                                      setState(() {
+                                        if (val == 0) {
+                                          _cantidades.remove(p.id);
+                                        } else {
+                                          _cantidades[p.id] = val;
+                                        }
+                                      });
+                                    },
                                   ),
                                 ),
                                 const SizedBox(width: 6),

@@ -8,7 +8,6 @@ import '../../../data/models/models.dart';
 import '../../../core/widgets/common_widgets.dart';
 import '../../../core/constants/api_config.dart';
 import 'promotor_abonos_screen.dart';
-import 'promotor_detalle_screen.dart';
 
 class PromotorEditarPedidoScreen extends StatefulWidget {
   final PedidoModel pedido;
@@ -192,24 +191,10 @@ class _PromotorEditarPedidoScreenState extends State<PromotorEditarPedidoScreen>
                 MaterialPageRoute(
                   builder: (_) => PromotorAbonosScreen(
                     preselectedCliente: widget.pedido.cliente,
-                    fromDelivery: false,
+                    fromDelivery: true,
                     fixedPedidoId: widget.pedido.id,
                     onAbonoRegistered: () {
-                      Navigator.pop(context);
-                      // Volver al detalle del pedido
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => PromotorDetalleScreen(cliente: widget.pedido.cliente),
-                        ),
-                      );
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Abono registrado. ${widget.pedido.cliente.nombre}'),
-                          backgroundColor: AppTheme.success,
-                        ),
-                      );
+                      Navigator.popUntil(context, (route) => route.isFirst);
                     },
                   ),
                 ),

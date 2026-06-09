@@ -432,27 +432,71 @@ class _PromotorDetalleScreenState extends State<PromotorDetalleScreen> {
                             widget.cliente.id,
                             !esAtendido,
                           );
-                          
-                          if (context.mounted) {
+
+                          if (!context.mounted) return;
+
+                          if (!esAtendido) {
+                            // Se marcó como atendido → preguntar si recibió abono
+                            final recibeAbono = await showDialog<bool>(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (ctx) => AlertDialog(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                title: const Row(
+                                  children: [
+                                    Icon(Icons.payments_outlined,
+                                        color: AppTheme.promotorColor),
+                                    SizedBox(width: 10),
+                                    Text('¿Recibiste un abono?'),
+                                  ],
+                                ),
+                                content: Text(
+                                  '¿${widget.cliente.nombre} realizó algún pago hoy?',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx, false),
+                                    child: const Text('No'),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed: () => Navigator.pop(ctx, true),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppTheme.promotorColor,
+                                    ),
+                                    child: const Text('Sí, registrar'),
+                                  ),
+                                ],
+                              ),
+                            );
+
+                            if (!context.mounted) return;
+
+                            if (recibeAbono == true) {
+                              // Ir a abonos con cliente preseleccionado y bloqueado
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => PromotorAbonosScreen(
+                                    preselectedCliente: widget.cliente,
+                                    fromDelivery: true,
+                                  ),
+                                ),
+                              );
+                            } else {
+                              // Sin abono → volver al home (que navegará a pedidos)
+                              Navigator.pop(context, 'atendido');
+                            }
+                          } else {
+                            // Se desmarcó como pendiente
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
-                                  !esAtendido 
-                                    ? '${widget.cliente.nombre} marcado como atendido' 
-                                    : '${widget.cliente.nombre} marcado como pendiente'
-                                ),
+                                    '${widget.cliente.nombre} marcado como pendiente'),
                                 backgroundColor: AppTheme.success,
                               ),
                             );
-                            
-                            if (!esAtendido) {
-                              // Si se marcó como atendido, volver atrás y señalizar para ir a pedidos
-                              Future.delayed(const Duration(milliseconds: 800), () {
-                                if (context.mounted) {
-                                  Navigator.pop(context, 'atendido');
-                                }
-                              });
-                            }
                           }
                         } catch (e) {
                           if (context.mounted) {

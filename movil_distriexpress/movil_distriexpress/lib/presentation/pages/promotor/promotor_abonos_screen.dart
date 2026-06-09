@@ -132,24 +132,48 @@ class _PromotorAbonosScreenState extends State<PromotorAbonosScreen> {
         return;
       }
     } else if (pedidoFijo != null) {
-      await state.agregarAbonoPedido(
-        pedidoFijo.id,
-        AbonoPedido(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          monto: monto,
-          tipo: 'Efectivo',
-          fecha: DateTime.now(),
-        ),
-      );
+      try {
+        await state.agregarAbonoPedido(
+          pedidoFijo.id,
+          AbonoPedido(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            monto: monto,
+            tipo: 'Efectivo',
+            fecha: DateTime.now(),
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al registrar abono: $e'),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+        return;
+      }
     } else {
-      await state.registrarAbono(
-        selectedCliente.id,
-        selectedCliente.nombre,
-        monto,
-        _obsController.text.trim().isEmpty
-            ? null
-            : _obsController.text.trim(),
-      );
+      try {
+        await state.registrarAbono(
+          selectedCliente.id,
+          selectedCliente.nombre,
+          monto,
+          _obsController.text.trim().isEmpty
+              ? null
+              : _obsController.text.trim(),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al registrar abono: $e'),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+        return;
+      }
     }
 
     if (!mounted) return;
@@ -369,9 +393,11 @@ class _PromotorAbonosScreenState extends State<PromotorAbonosScreen> {
                           pedidosDelCliente = pedidosUnicos.values.toList();
                           
                           // Validar que el pedido seleccionado siga siendo válido
-                          if (_selectedPedidoId != null && 
+                          if (_selectedPedidoId != null &&
                               !pedidosDelCliente.any((p) => p.id == _selectedPedidoId)) {
-                            _selectedPedidoId = null;
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (mounted) setState(() => _selectedPedidoId = null);
+                            });
                           }
                           if (pedidosDelCliente.length > 1) {
                             return Column(

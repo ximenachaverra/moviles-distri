@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/app_state.dart';
@@ -17,9 +17,9 @@ class RepartidorHomeScreen extends StatefulWidget {
 
 class _RepartidorHomeScreenState extends State<RepartidorHomeScreen> {
   int _selectedIndex = 0;
-  int _currentPage = 0;
+  int _clientesMostrados = 5;
+  static const int _clientesPorPagina = 5;
   final TextEditingController _searchCtrl = TextEditingController();
-  final int _clientesPorPagina = 6;
 
   @override
   void dispose() {
@@ -34,28 +34,36 @@ class _RepartidorHomeScreenState extends State<RepartidorHomeScreen> {
     final atendidos = state.clientes.where((c) => c.estado == EstadoCliente.atendido).length;
     final total = state.clientes.length;
     final query = _searchCtrl.text.trim().toLowerCase();
-    
+
     // Filtrar y ordenar: primero pendientes, luego atendidos
     final clientesFiltrados = state.clientes
         .where((c) =>
-            '${c.nombre} ${c.zona} ${c.direccion}'.toLowerCase().contains(query) || query.isEmpty)
+            query.isEmpty ||
+            '${c.nombre} ${c.zona} ${c.direccion}'.toLowerCase().contains(query))
         .toList()
-        ..sort((a, b) {
-          // Pendientes primero, atendidos al final
-          if (a.estado == EstadoCliente.atendido && b.estado != EstadoCliente.atendido) return 1;
-          if (a.estado != EstadoCliente.atendido && b.estado == EstadoCliente.atendido) return -1;
-          return 0;
-        });
-    
-    // Calcular paginación
-    final totalPaginas = (clientesFiltrados.length / _clientesPorPagina).ceil();
-    if (_currentPage >= totalPaginas && totalPaginas > 0) {
-      _currentPage = totalPaginas - 1;
+      ..sort((a, b) {
+        if (a.estado == EstadoCliente.atendido && b.estado != EstadoCliente.atendido) return 1;
+        if (a.estado != EstadoCliente.atendido && b.estado == EstadoCliente.atendido) return -1;
+        return 0;
+      });
+
+    final clientesVisibles = clientesFiltrados.take(_clientesMostrados).toList();
+
+    // Nombre de la ruta asignada
+    String nombreRuta = 'Sin asignar';
+    final ruta = state.rutaActual;
+    if (ruta != null) {
+      final nombre = ruta['nombre'];
+      final zona = ruta['zona'];
+      final id = ruta['id'];
+      if (nombre != null && nombre.toString().trim().isNotEmpty) {
+        nombreRuta = nombre.toString().trim();
+      } else if (zona != null && zona.toString().trim().isNotEmpty) {
+        nombreRuta = 'Zona ${zona.toString().trim()}';
+      } else if (id != null) {
+        nombreRuta = 'Ruta #${id.toString()}';
+      }
     }
-    
-    final indexInicial = _currentPage * _clientesPorPagina;
-    final indexFinal = (indexInicial + _clientesPorPagina).clamp(0, clientesFiltrados.length);
-    final clientesPagina = clientesFiltrados.sublist(indexInicial, indexFinal);
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -63,7 +71,8 @@ class _RepartidorHomeScreenState extends State<RepartidorHomeScreen> {
         backgroundColor: AppTheme.surface,
         elevation: 0,
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(user.nombreCompleto, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+          Text(user.nombreCompleto,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
           RoleBadge(rol: user.rol),
         ]),
         actions: [
@@ -82,9 +91,34 @@ class _RepartidorHomeScreenState extends State<RepartidorHomeScreen> {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 const Divider(height: 1, color: AppTheme.border),
                 const SizedBox(height: 16),
+                // Nombre de ruta
+                Row(children: [
+                  const Icon(Icons.route_rounded, size: 16, color: AppTheme.primary),
+                  const SizedBox(width: 6),
+                  const Text('RUTA:',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textSecondary,
+                          letterSpacing: 0.5)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(nombreRuta,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.primary)),
+                  ),
+                ]),
+                const SizedBox(height: 12),
+                // Progreso
                 Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  const Text('Progreso de ruta', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
-                  Text('$atendidos / $total entregas', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.primary)),
+                  const Text('Progreso de ruta',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                  Text('$atendidos / $total entregas',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.primary)),
                 ]),
                 const SizedBox(height: 8),
                 ClipRRect(
@@ -99,7 +133,7 @@ class _RepartidorHomeScreenState extends State<RepartidorHomeScreen> {
                 const SizedBox(height: 16),
                 TextField(
                   controller: _searchCtrl,
-                  onChanged: (_) => setState(() {}),
+                  onChanged: (_) => setState(() { _clientesMostrados = _clientesPorPagina; }),
                   decoration: const InputDecoration(
                     hintText: 'Buscar cliente, zona o dirección',
                     prefixIcon: Icon(Icons.search_rounded),
@@ -120,7 +154,10 @@ class _RepartidorHomeScreenState extends State<RepartidorHomeScreen> {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
               child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                const SectionHeader(title: 'RUTA DEL DÍA', subtitle: 'Toca un cliente para gestionar la entrega'),
+                const Flexible(
+                  flex: 2,
+                  child: SectionHeader(title: 'CLIENTES EN RUTA', subtitle: 'Toca un cliente para gestionar la entrega'),
+                ),
                 GestureDetector(
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AbonosScreen())),
                   child: Container(
@@ -133,7 +170,8 @@ class _RepartidorHomeScreenState extends State<RepartidorHomeScreen> {
                     child: const Row(children: [
                       Icon(Icons.payments_outlined, size: 14, color: AppTheme.repartidorColor),
                       SizedBox(width: 4),
-                      Text('Abonos', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.repartidorColor)),
+                      Text('Abonos',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.repartidorColor)),
                     ]),
                   ),
                 ),
@@ -145,49 +183,36 @@ class _RepartidorHomeScreenState extends State<RepartidorHomeScreen> {
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
-                  final cliente = clientesPagina[index];
+                  final cliente = clientesVisibles[index];
                   return ClienteCard(
                     cliente: cliente,
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => RepartidorDetalleScreen(cliente: cliente))),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => RepartidorDetalleScreen(cliente: cliente)),
+                    ),
                   );
                 },
-                childCount: clientesPagina.length,
+                childCount: clientesVisibles.length,
               ),
             ),
           ),
-          // Paginación
-          if (clientesFiltrados.isNotEmpty)
+          if (clientesFiltrados.length > _clientesMostrados)
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    IconButton(
-                      onPressed: _currentPage > 0
-                          ? () => setState(() => _currentPage--)
-                          : null,
-                      icon: const Icon(Icons.arrow_back_ios_rounded),
-                      tooltip: 'Página anterior',
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Página ${_currentPage + 1} de $totalPaginas',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      onPressed: _currentPage < totalPaginas - 1
-                          ? () => setState(() => _currentPage++)
-                          : null,
-                      icon: const Icon(Icons.arrow_forward_ios_rounded),
-                      tooltip: 'Página siguiente',
-                    ),
-                  ],
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+                child: OutlinedButton.icon(
+                  onPressed: () => setState(() => _clientesMostrados += _clientesPorPagina),
+                  icon: const Icon(Icons.expand_more_rounded, size: 18),
+                  label: Text(
+                    'Ver más (${clientesFiltrados.length - _clientesMostrados} restantes)',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.repartidorColor,
+                    side: BorderSide(color: AppTheme.repartidorColor.withValues(alpha: 0.4)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
                 ),
               ),
             ),
@@ -195,7 +220,8 @@ class _RepartidorHomeScreenState extends State<RepartidorHomeScreen> {
         ],
       ),
       bottomNavigationBar: Container(
-        decoration: const BoxDecoration(color: AppTheme.surface, border: Border(top: BorderSide(color: AppTheme.border))),
+        decoration: const BoxDecoration(
+            color: AppTheme.surface, border: Border(top: BorderSide(color: AppTheme.border))),
         child: BottomNavigationBar(
           currentIndex: _selectedIndex,
           backgroundColor: Colors.transparent,

@@ -495,67 +495,79 @@ class _RepartidorDetalleScreenState extends State<RepartidorDetalleScreen> {
                   if (clienteActualizado.estado != EstadoCliente.atendido && pedidoPrincipal != null) ...[
                     const SizedBox(width: 12),
                     Expanded(
-                      child: Consumer<AppState>(
-                        builder: (context, appState, _) {
-                          final pedidoActualizado = appState.pedidos.firstWhere(
-                            (p) => p.id == pedidoPrincipal!.id,
-                            orElse: () => pedidoPrincipal!,
-                          );
-                          final esEntregado = pedidoActualizado.entregado ?? false;
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          final appState = context.read<AppState>();
+                          try {
+                            await appState.marcarEntregaAtendida(
+                              pedidoPrincipal.id,
+                            );
+                            if (!context.mounted) return;
 
-                          return ElevatedButton.icon(
-                            onPressed: () async {
-                              try {
-                                await appState.toggleEntregadoPedido(
-                                  pedidoPrincipal!.id,
-                                  !esEntregado,
-                                );
+                            final recibeAbono = await showDialog<bool>(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (ctx) => AlertDialog(
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16)),
+                                title: const Row(children: [
+                                  Icon(Icons.payments_outlined,
+                                      color: AppTheme.repartidorColor),
+                                  SizedBox(width: 10),
+                                  Text('¿Recibiste un abono?'),
+                                ]),
+                                content: Text(
+                                    '¿${widget.cliente.nombre} realizó algún pago hoy?'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx, false),
+                                    child: const Text('No'),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed: () => Navigator.pop(ctx, true),
+                                    style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppTheme.repartidorColor),
+                                    child: const Text('Sí, registrar'),
+                                  ),
+                                ],
+                              ),
+                            );
 
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        !esEntregado
-                                            ? 'Pedido marcado como entregado'
-                                            : 'Pedido marcado como pendiente',
-                                      ),
-                                      backgroundColor: AppTheme.success,
-                                    ),
-                                  );
-
-                                  if (!esEntregado) {
-                                    // Si se marcó como entregado, volver atrás después de 1 segundo
-                                    Future.delayed(const Duration(milliseconds: 800), () {
-                                      if (context.mounted) {
-                                        Navigator.pop(context);
-                                      }
-                                    });
-                                  }
-                                }
-                              } catch (e) {
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Error al actualizar estado: $e'),
-                                      backgroundColor: AppTheme.error,
-                                    ),
-                                  );
-                                }
-                              }
-                            },
-                            icon: Icon(
-                              esEntregado ? Icons.check_circle : Icons.check_rounded,
-                              size: 18,
-                            ),
-                            label: Text(esEntregado ? 'Entregado ✓' : 'Entregado'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: esEntregado
-                                  ? AppTheme.success
-                                  : AppTheme.repartidorColor,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                            ),
-                          );
+                            if (!context.mounted) return;
+                            if (recibeAbono == true) {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => AbonosScreen(
+                                    preselectedCliente: widget.cliente,
+                                    fromDelivery: true,
+                                    onAbonoRegistered: () {
+                                      Navigator.popUntil(
+                                          context, (route) => route.isFirst);
+                                    },
+                                  ),
+                                ),
+                              );
+                            } else {
+                              Navigator.pop(context);
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Error al actualizar estado: $e'),
+                                  backgroundColor: AppTheme.error,
+                                ),
+                              );
+                            }
+                          }
                         },
+                        icon: const Icon(Icons.check_rounded, size: 18),
+                        label: const Text('Entregado'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.repartidorColor,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
                       ),
                     ),
                   ],

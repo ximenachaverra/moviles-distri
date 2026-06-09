@@ -19,6 +19,8 @@ class PromotorHomeScreen extends StatefulWidget {
 class _PromotorHomeScreenState extends State<PromotorHomeScreen> {
   int _selectedIndex = 0;
   final TextEditingController _searchCtrl = TextEditingController();
+  int _clientesMostrados = 5;
+  static const int _clientesPorPagina = 5;
 
   @override
   void dispose() {
@@ -122,7 +124,7 @@ class _PromotorHomeScreenState extends State<PromotorHomeScreen> {
                     const SizedBox(height: 16),
                     TextField(
                       controller: _searchCtrl,
-                      onChanged: (_) => setState(() {}),
+                      onChanged: (_) => setState(() { _clientesMostrados = _clientesPorPagina; }),
                       decoration: const InputDecoration(
                         hintText: 'Buscar cliente, zona o dirección',
                         prefixIcon: Icon(Icons.search_rounded),
@@ -249,10 +251,31 @@ class _PromotorHomeScreenState extends State<PromotorHomeScreen> {
                     }),
                   );
                 },
-                childCount: clientesFiltrados.length,
+                childCount: clientesFiltrados.take(_clientesMostrados).length,
               ),
             ),
           ),
+          if (clientesFiltrados.length > _clientesMostrados)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+                child: OutlinedButton.icon(
+                  onPressed: () => setState(
+                      () => _clientesMostrados += _clientesPorPagina),
+                  icon: const Icon(Icons.expand_more_rounded, size: 18),
+                  label: Text(
+                    'Ver más (${clientesFiltrados.length - _clientesMostrados} restantes)',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.promotorColor,
+                    side: BorderSide(color: AppTheme.promotorColor.withValues(alpha: 0.4)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            ),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
         ],
       ),
