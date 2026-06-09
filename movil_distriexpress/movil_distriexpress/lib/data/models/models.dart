@@ -3,7 +3,9 @@ enum UserRole { repartidor, promotor }
 
 enum EstadoCliente {
   pendiente,
-  atendido;
+  atendido,
+  entregado,
+  noEntregado;
 
   String get label {
     switch (this) {
@@ -11,6 +13,10 @@ enum EstadoCliente {
         return 'Pendiente';
       case EstadoCliente.atendido:
         return 'Atendido';
+      case EstadoCliente.entregado:
+        return 'Entregado';
+      case EstadoCliente.noEntregado:
+        return 'No Entregado';
     }
   }
 
@@ -18,6 +24,10 @@ enum EstadoCliente {
     switch (s.toLowerCase()) {
       case 'atendido':
         return EstadoCliente.atendido;
+      case 'entregado':
+        return EstadoCliente.entregado;
+      case 'noentregado':
+        return EstadoCliente.noEntregado;
       default:
         return EstadoCliente.pendiente;
     }
@@ -234,6 +244,7 @@ class ClienteModel {
   final double lng;
   final double saldoPendiente;
   EstadoCliente estado;
+  final String? observacion;
 
   ClienteModel({
     required this.id,
@@ -244,6 +255,7 @@ class ClienteModel {
     required this.lng,
     this.saldoPendiente = 0,
     this.estado = EstadoCliente.pendiente,
+    this.observacion,
   });
 
   factory ClienteModel.fromJson(Map<String, dynamic> json) => ClienteModel(
@@ -256,6 +268,7 @@ class ClienteModel {
         saldoPendiente:
             _toDouble(json['saldo_pendiente'] ?? json['saldoPendiente']),
         estado: EstadoCliente.fromString((json['estado'] ?? 'pendiente').toString()),
+        observacion: json['observacion']?.toString(),
       );
 }
 

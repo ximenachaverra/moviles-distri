@@ -22,6 +22,77 @@ class RepartidorDetalleScreen extends StatefulWidget {
 class _RepartidorDetalleScreenState extends State<RepartidorDetalleScreen> {
   final fmt = NumberFormat('#,###', 'es_CO');
 
+  Future<void> _marcarNoEntregado(PedidoModel pedido) async {
+    final obsCtrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(children: [
+          Icon(Icons.cancel_outlined, color: AppTheme.error),
+          SizedBox(width: 10),
+          Text('No Entregado'),
+        ]),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('¿Por qué no se pudo entregar?',
+                style: TextStyle(fontSize: 14, color: AppTheme.textSecondary)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: obsCtrl,
+              maxLines: 3,
+              autofocus: true,
+              decoration: const InputDecoration(
+                hintText: 'Escribe la razón...',
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.all(12),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (obsCtrl.text.trim().isEmpty) return;
+              Navigator.pop(ctx, true);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+            child: const Text('Confirmar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+    final observacion = obsCtrl.text.trim();
+    if (observacion.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Debes escribir una observación')),
+        );
+      }
+      return;
+    }
+
+    try {
+      await context.read<AppState>().marcarEntregaNoEntregada(pedido.id, observacion);
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: AppTheme.error),
+        );
+      }
+    }
+  }
+
   Future<void> _abrirRuta() async {
     if (widget.cliente.lat == 0 && widget.cliente.lng == 0) {
       if (mounted) {
@@ -144,32 +215,25 @@ class _RepartidorDetalleScreenState extends State<RepartidorDetalleScreen> {
                             ],
                           ),
                         ),
+                        // Badge "Debe" al lado derecho
                         if (widget.cliente.saldoPendiente > 0)
                           Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
                               color: AppTheme.warning.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Column(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Text(
-                                  'Debe',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: AppTheme.warning,
-                                  ),
-                                ),
+                                const Text('Debe',
+                                    style: TextStyle(fontSize: 10, color: AppTheme.warning)),
                                 Text(
                                   '\$${fmt.format(widget.cliente.saldoPendiente)}',
                                   style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppTheme.warning,
-                                  ),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.warning),
                                 ),
                               ],
                             ),
@@ -308,7 +372,32 @@ class _RepartidorDetalleScreenState extends State<RepartidorDetalleScreen> {
                   const SizedBox(height: 16),
 
                   if (pedidoPrincipal != null) ...[
-                    const SectionHeader(title: 'PEDIDO'),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const SectionHeader(title: 'PEDIDO'),
+                        GestureDetector(
+                          onTap: () => _verDetallePedido(pedidoPrincipal),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.receipt_long_outlined, size: 14, color: AppTheme.primary),
+                                SizedBox(width: 5),
+                                Text('Ver Pedido',
+                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.primary)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 10),
                     Container(
                       decoration: BoxDecoration(
@@ -461,47 +550,23 @@ class _RepartidorDetalleScreenState extends State<RepartidorDetalleScreen> {
               ),
             ),
           ),
-          PointerInterceptor(
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: AppTheme.surface,
-                border: Border(top: BorderSide(color: AppTheme.border)),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        if (pedidoPrincipal != null) {
-                          _verDetallePedido(pedidoPrincipal);
-                          return;
-                        }
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Este cliente no tiene pedido registrado',
-                            ),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.receipt_long_outlined, size: 18),
-                      label: const Text('Ver pedido'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                    ),
-                  ),
-                  if (clienteActualizado.estado != EstadoCliente.atendido && pedidoPrincipal != null) ...[
-                    const SizedBox(width: 12),
+          if (clienteActualizado.estado == EstadoCliente.pendiente && pedidoPrincipal != null)
+            PointerInterceptor(
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: const BoxDecoration(
+                  color: AppTheme.surface,
+                  border: Border(top: BorderSide(color: AppTheme.border)),
+                ),
+                child: Row(
+                  children: [
+                    // Botón Entregado
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: () async {
                           final appState = context.read<AppState>();
                           try {
-                            await appState.marcarEntregaAtendida(
-                              pedidoPrincipal.id,
-                            );
+                            await appState.marcarEntregaAtendida(pedidoPrincipal.id);
                             if (!context.mounted) return;
 
                             final recibeAbono = await showDialog<bool>(
@@ -511,13 +576,11 @@ class _RepartidorDetalleScreenState extends State<RepartidorDetalleScreen> {
                                 shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(16)),
                                 title: const Row(children: [
-                                  Icon(Icons.payments_outlined,
-                                      color: AppTheme.repartidorColor),
+                                  Icon(Icons.payments_outlined, color: AppTheme.repartidorColor),
                                   SizedBox(width: 10),
                                   Text('¿Recibiste un abono?'),
                                 ]),
-                                content: Text(
-                                    '¿${widget.cliente.nombre} realizó algún pago hoy?'),
+                                content: Text('¿${widget.cliente.nombre} realizó algún pago hoy?'),
                                 actions: [
                                   TextButton(
                                     onPressed: () => Navigator.pop(ctx, false),
@@ -542,8 +605,7 @@ class _RepartidorDetalleScreenState extends State<RepartidorDetalleScreen> {
                                     preselectedCliente: widget.cliente,
                                     fromDelivery: true,
                                     onAbonoRegistered: () {
-                                      Navigator.popUntil(
-                                          context, (route) => route.isFirst);
+                                      Navigator.popUntil(context, (route) => route.isFirst);
                                     },
                                   ),
                                 ),
@@ -555,7 +617,7 @@ class _RepartidorDetalleScreenState extends State<RepartidorDetalleScreen> {
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text('Error al actualizar estado: $e'),
+                                  content: Text('Error: $e'),
                                   backgroundColor: AppTheme.error,
                                 ),
                               );
@@ -570,11 +632,23 @@ class _RepartidorDetalleScreenState extends State<RepartidorDetalleScreen> {
                         ),
                       ),
                     ),
+                    const SizedBox(width: 12),
+                    // Botón No Entregado
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _marcarNoEntregado(pedidoPrincipal),
+                        icon: const Icon(Icons.close_rounded, size: 18),
+                        label: const Text('No Entregado'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.error,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                      ),
+                    ),
                   ],
-                ],
+                ),
               ),
             ),
-          ),
         ],
       ),
     );

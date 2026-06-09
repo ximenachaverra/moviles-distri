@@ -949,10 +949,7 @@ class AppState extends ChangeNotifier {
   }
 
   /// Marca un pedido como entregado en el sistema de entregas (Repartidor).
-  /// Llama a: PATCH /api/entregas/pedidos/:pedidoId/estado { estado_asignacion: 'Atendida' }
-  /// Actualiza localmente el estado del cliente a atendido.
   Future<void> marcarEntregaAtendida(String pedidoId) async {
-    // Optimistic update: marcar el cliente de este pedido como atendido
     final pedidoIdx = _pedidos.indexWhere((p) => p.id == pedidoId);
     if (pedidoIdx < 0) throw Exception('Pedido no encontrado');
 
@@ -961,7 +958,7 @@ class AppState extends ChangeNotifier {
     final estadoAnterior = clienteIdx >= 0 ? _clientes[clienteIdx].estado : null;
 
     if (clienteIdx >= 0) {
-      _clientes[clienteIdx].estado = EstadoCliente.atendido;
+      _clientes[clienteIdx].estado = EstadoCliente.entregado;
       notifyListeners();
     }
 
@@ -972,7 +969,35 @@ class AppState extends ChangeNotifier {
       );
       await fetchClientes();
     } catch (e) {
-      // Revertir si falla
+      if (clienteIdx >= 0 && estadoAnterior != null) {
+        _clientes[clienteIdx].estado = estadoAnterior;
+        notifyListeners();
+      }
+      rethrow;
+    }
+  }
+
+  /// Marca un pedido como no entregado (Rechazada) con observación del repartidor.
+  Future<void> marcarEntregaNoEntregada(String pedidoId, String observacion) async {
+    final pedidoIdx = _pedidos.indexWhere((p) => p.id == pedidoId);
+    if (pedidoIdx < 0) throw Exception('Pedido no encontrado');
+
+    final clienteId = _pedidos[pedidoIdx].cliente.id;
+    final clienteIdx = _clientes.indexWhere((c) => c.id == clienteId);
+    final estadoAnterior = clienteIdx >= 0 ? _clientes[clienteIdx].estado : null;
+
+    if (clienteIdx >= 0) {
+      _clientes[clienteIdx].estado = EstadoCliente.noEntregado;
+      notifyListeners();
+    }
+
+    try {
+      await _dio.patch(
+        '${ApiConfig.entregas}/pedidos/$pedidoId/estado',
+        data: {'estado_asignacion': 'Rechazada', 'observacion': observacion},
+      );
+      await fetchClientes();
+    } catch (e) {
       if (clienteIdx >= 0 && estadoAnterior != null) {
         _clientes[clienteIdx].estado = estadoAnterior;
         notifyListeners();

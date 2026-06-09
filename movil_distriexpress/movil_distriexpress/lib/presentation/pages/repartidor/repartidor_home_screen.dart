@@ -27,25 +27,81 @@ class _RepartidorHomeScreenState extends State<RepartidorHomeScreen> {
     super.dispose();
   }
 
+  void _mostrarObservacion(BuildContext context, ClienteModel cliente) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(children: [
+          const Icon(Icons.cancel_rounded, color: AppTheme.error),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(cliente.nombre,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
+          ),
+        ]),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Motivo de no entrega:',
+                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.error.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppTheme.error.withValues(alpha: 0.2)),
+              ),
+              child: Text(
+                cliente.observacion?.isNotEmpty == true
+                    ? cliente.observacion!
+                    : 'Sin observación registrada',
+                style: const TextStyle(fontSize: 14, color: AppTheme.textPrimary),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+            child: const Text('Cerrar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
     final user = state.currentUser!;
-    final atendidos = state.clientes.where((c) => c.estado == EstadoCliente.atendido).length;
+    final entregados = state.clientes.where((c) => c.estado == EstadoCliente.entregado || c.estado == EstadoCliente.atendido).length;
+    final noEntregados = state.clientes.where((c) => c.estado == EstadoCliente.noEntregado).length;
     final total = state.clientes.length;
     final query = _searchCtrl.text.trim().toLowerCase();
 
-    // Filtrar y ordenar: primero pendientes, luego atendidos
+    // Ordenar: pendientes → no entregados → entregados
+    int estadoOrden(EstadoCliente e) {
+      switch (e) {
+        case EstadoCliente.pendiente: return 0;
+        case EstadoCliente.noEntregado: return 1;
+        case EstadoCliente.entregado: return 2;
+        case EstadoCliente.atendido: return 2;
+      }
+    }
+
     final clientesFiltrados = state.clientes
         .where((c) =>
             query.isEmpty ||
             '${c.nombre} ${c.zona} ${c.direccion}'.toLowerCase().contains(query))
         .toList()
-      ..sort((a, b) {
-        if (a.estado == EstadoCliente.atendido && b.estado != EstadoCliente.atendido) return 1;
-        if (a.estado != EstadoCliente.atendido && b.estado == EstadoCliente.atendido) return -1;
-        return 0;
-      });
+      ..sort((a, b) => estadoOrden(a.estado) - estadoOrden(b.estado));
 
     final clientesVisibles = clientesFiltrados.take(_clientesMostrados).toList();
 
@@ -117,14 +173,14 @@ class _RepartidorHomeScreenState extends State<RepartidorHomeScreen> {
                 Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                   const Text('Progreso de ruta',
                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
-                  Text('$atendidos / $total entregas',
+                  Text('$entregados / $total entregas',
                       style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.primary)),
                 ]),
                 const SizedBox(height: 8),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: LinearProgressIndicator(
-                    value: total > 0 ? atendidos / total : 0,
+                    value: total > 0 ? entregados / total : 0,
                     backgroundColor: AppTheme.primaryLight,
                     valueColor: const AlwaysStoppedAnimation(AppTheme.primary),
                     minHeight: 8,
@@ -141,9 +197,9 @@ class _RepartidorHomeScreenState extends State<RepartidorHomeScreen> {
                 ),
                 const SizedBox(height: 12),
                 Row(children: [
-                  StatCard(label: 'Pendientes', value: '${total - atendidos}', icon: Icons.pending_actions_rounded, color: AppTheme.accentOrange),
+                  StatCard(label: 'Pendientes', value: '${total - entregados - noEntregados}', icon: Icons.pending_actions_rounded, color: AppTheme.accentOrange),
                   const SizedBox(width: 10),
-                  StatCard(label: 'Entregados', value: '$atendidos', icon: Icons.check_circle_outline_rounded, color: AppTheme.success),
+                  StatCard(label: 'Entregados', value: '$entregados', icon: Icons.check_circle_outline_rounded, color: AppTheme.success),
                   const SizedBox(width: 10),
                   StatCard(label: 'Abonos hoy', value: '${state.abonos.length}', icon: Icons.payments_outlined, color: AppTheme.primary),
                 ]),
@@ -184,12 +240,18 @@ class _RepartidorHomeScreenState extends State<RepartidorHomeScreen> {
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
                   final cliente = clientesVisibles[index];
+                  final esNoEntregado = cliente.estado == EstadoCliente.noEntregado;
+                  final esPendiente = cliente.estado == EstadoCliente.pendiente;
                   return ClienteCard(
                     cliente: cliente,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => RepartidorDetalleScreen(cliente: cliente)),
-                    ),
+                    onTap: esNoEntregado
+                        ? () => _mostrarObservacion(context, cliente)
+                        : esPendiente
+                            ? () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => RepartidorDetalleScreen(cliente: cliente)),
+                                )
+                            : null, // entregado → sin acción
                   );
                 },
                 childCount: clientesVisibles.length,

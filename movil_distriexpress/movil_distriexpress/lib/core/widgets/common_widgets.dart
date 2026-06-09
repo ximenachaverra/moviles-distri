@@ -7,39 +7,55 @@ import 'package:intl/intl.dart';
 
 class ClienteCard extends StatelessWidget {
   final ClienteModel cliente;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final Function(bool)? onToggleAtendido;
 
   const ClienteCard({
     super.key,
     required this.cliente,
-    required this.onTap,
+    this.onTap,
     this.onToggleAtendido,
   });
 
   @override
   Widget build(BuildContext context) {
+    final esAtendido = cliente.estado == EstadoCliente.atendido;
+    final esEntregado = cliente.estado == EstadoCliente.entregado;
+    final esNoEntregado = cliente.estado == EstadoCliente.noEntregado;
+    final esCompletado = esAtendido || esEntregado;
+
+    Color cardColor;
+    Color borderColor;
+    Color shadowColor;
+    if (esCompletado) {
+      cardColor = AppTheme.success.withValues(alpha: 0.08);
+      borderColor = AppTheme.success.withValues(alpha: 0.3);
+      shadowColor = AppTheme.success.withValues(alpha: 0.1);
+    } else if (esNoEntregado) {
+      cardColor = AppTheme.error.withValues(alpha: 0.06);
+      borderColor = AppTheme.error.withValues(alpha: 0.3);
+      shadowColor = AppTheme.error.withValues(alpha: 0.08);
+    } else {
+      cardColor = AppTheme.surface;
+      borderColor = AppTheme.border;
+      shadowColor = Colors.black.withValues(alpha: 0.03);
+    }
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: cliente.estado == EstadoCliente.atendido
-              ? AppTheme.success.withValues(alpha: 0.08)
-              : AppTheme.surface,
+          color: cardColor,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: cliente.estado == EstadoCliente.atendido
-                ? AppTheme.success.withValues(alpha: 0.3)
-                : AppTheme.border,
-            width: cliente.estado == EstadoCliente.atendido ? 1.5 : 1,
+            color: borderColor,
+            width: (esCompletado || esNoEntregado) ? 1.5 : 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: cliente.estado == EstadoCliente.atendido
-                  ? AppTheme.success.withValues(alpha: 0.1)
-                  : Colors.black.withValues(alpha: 0.03),
+              color: shadowColor,
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -52,14 +68,24 @@ class ClienteCard extends StatelessWidget {
               width: 46,
               height: 46,
               decoration: BoxDecoration(
-                color: cliente.estado == EstadoCliente.atendido
+                color: esCompletado
                     ? AppTheme.success.withValues(alpha: 0.15)
-                    : AppTheme.primaryLight,
+                    : esNoEntregado
+                        ? AppTheme.error.withValues(alpha: 0.12)
+                        : AppTheme.primaryLight,
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                cliente.estado == EstadoCliente.atendido ? Icons.check_circle : Icons.store_rounded,
-                color: cliente.estado == EstadoCliente.atendido ? AppTheme.success : AppTheme.primary,
+                esCompletado
+                    ? Icons.check_circle
+                    : esNoEntregado
+                        ? Icons.cancel_rounded
+                        : Icons.store_rounded,
+                color: esCompletado
+                    ? AppTheme.success
+                    : esNoEntregado
+                        ? AppTheme.error
+                        : AppTheme.primary,
                 size: 22,
               ),
             ),
@@ -97,8 +123,8 @@ class ClienteCard extends StatelessWidget {
                 ],
               ),
             ),
-            // Badge saldo / check / toggle button
-            if (cliente.estado == EstadoCliente.atendido)
+            // Badge de estado
+            if (esAtendido)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
@@ -113,14 +139,8 @@ class ClienteCard extends StatelessWidget {
                           children: [
                             Icon(Icons.check_rounded, size: 14, color: Colors.white),
                             SizedBox(width: 4),
-                            Text(
-                              'Atendido',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                            Text('Atendido',
+                                style: TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600)),
                           ],
                         ),
                       )
@@ -129,21 +149,48 @@ class ClienteCard extends StatelessWidget {
                         children: [
                           Icon(Icons.check_rounded, size: 14, color: Colors.white),
                           SizedBox(width: 4),
-                          Text(
-                            'Atendido',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+                          Text('Atendido',
+                              style: TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600)),
                         ],
                       ),
               )
+            else if (esEntregado)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppTheme.success,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.check_rounded, size: 14, color: Colors.white),
+                    SizedBox(width: 4),
+                    Text('Entregado',
+                        style: TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              )
+            else if (esNoEntregado)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppTheme.error,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.close_rounded, size: 14, color: Colors.white),
+                    SizedBox(width: 4),
+                    Text('No Entregado',
+                        style: TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              )
             else if (cliente.saldoPendiente > 0)
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppTheme.warning.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
@@ -165,30 +212,21 @@ class ClienteCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: AppTheme.promotorColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: AppTheme.promotorColor.withValues(alpha: 0.3),
-                    ),
+                    border: Border.all(color: AppTheme.promotorColor.withValues(alpha: 0.3)),
                   ),
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(Icons.radio_button_unchecked, size: 14, color: AppTheme.promotorColor),
                       SizedBox(width: 4),
-                      Text(
-                        'Marcar',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppTheme.promotorColor,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                      Text('Marcar',
+                          style: TextStyle(fontSize: 12, color: AppTheme.promotorColor, fontWeight: FontWeight.w600)),
                     ],
                   ),
                 ),
               )
             else
-              const Icon(Icons.chevron_right_rounded,
-                  color: AppTheme.textSecondary),
+              const Icon(Icons.chevron_right_rounded, color: AppTheme.textSecondary),
           ],
         ),
       ),
