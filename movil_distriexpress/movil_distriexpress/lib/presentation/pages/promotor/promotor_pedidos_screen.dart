@@ -1,4 +1,5 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -1048,25 +1049,29 @@ class _CrearPedidoScreenState extends State<CrearPedidoScreen> {
       Navigator.pop(context, resumenPedido);
     } catch (e) {
       if (!mounted) return;
-      // Extraer mensaje del error del servidor si está disponible
       String mensajeError = 'Error al guardar el pedido';
-      final errorStr = e.toString();
-      if (errorStr.contains('Stock insuficiente') || errorStr.contains('stock')) {
-        mensajeError = errorStr.replaceAll('DioException [bad response]:', '').trim();
-      } else if (errorStr.contains('400') || errorStr.contains('Bad Request')) {
-        mensajeError = 'Datos inválidos. Verifica los productos y cantidades.';
-      } else if (errorStr.contains('401') || errorStr.contains('403')) {
-        mensajeError = 'Sin autorización. Vuelve a iniciar sesión.';
-      } else if (errorStr.contains('500')) {
-        mensajeError = 'Error en el servidor. Intenta de nuevo.';
-      } else if (errorStr.contains('SocketException') || errorStr.contains('connection')) {
-        mensajeError = 'Sin conexión al servidor. Verifica tu red.';
+      if (e is DioException) {
+        final data = e.response?.data;
+        if (data is Map && data['error'] != null) {
+          mensajeError = data['error'].toString();
+        } else if (e.response?.statusCode == 403) {
+          mensajeError = 'Sin autorización. Verifica tu rol de usuario.';
+        } else if (e.response?.statusCode == 401) {
+          mensajeError = 'Sesión expirada. Vuelve a iniciar sesión.';
+        } else if (e.type == DioExceptionType.connectionTimeout ||
+            e.type == DioExceptionType.receiveTimeout ||
+            e.type == DioExceptionType.connectionError) {
+          mensajeError = 'Sin conexión al servidor. Verifica tu red.';
+        }
+      } else if (e is Exception) {
+        final msg = e.toString().replaceFirst('Exception: ', '');
+        if (msg.isNotEmpty) mensajeError = msg;
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(mensajeError),
           backgroundColor: AppTheme.error,
-          duration: const Duration(seconds: 4),
+          duration: const Duration(seconds: 5),
         ),
       );
     }

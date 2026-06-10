@@ -23,7 +23,9 @@ class _RepartidorDetalleScreenState extends State<RepartidorDetalleScreen> {
   final fmt = NumberFormat('#,###', 'es_CO');
 
   Future<void> _marcarNoEntregado(PedidoModel pedido) async {
-    final obsCtrl = TextEditingController();
+    // Capturar antes de cualquier await
+    final appState = context.read<AppState>();
+
     final confirmed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -34,24 +36,9 @@ class _RepartidorDetalleScreenState extends State<RepartidorDetalleScreen> {
           SizedBox(width: 10),
           Text('No Entregado'),
         ]),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('¿Por qué no se pudo entregar?',
-                style: TextStyle(fontSize: 14, color: AppTheme.textSecondary)),
-            const SizedBox(height: 12),
-            TextField(
-              controller: obsCtrl,
-              maxLines: 3,
-              autofocus: true,
-              decoration: const InputDecoration(
-                hintText: 'Escribe la razón...',
-                border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.all(12),
-              ),
-            ),
-          ],
+        content: const Text(
+          '¿Confirmas que no se pudo realizar esta entrega?\n\nEl pedido quedará disponible para ser reasignado.',
+          style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
         ),
         actions: [
           TextButton(
@@ -59,10 +46,7 @@ class _RepartidorDetalleScreenState extends State<RepartidorDetalleScreen> {
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
-            onPressed: () {
-              if (obsCtrl.text.trim().isEmpty) return;
-              Navigator.pop(ctx, true);
-            },
+            onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
             child: const Text('Confirmar'),
           ),
@@ -71,18 +55,9 @@ class _RepartidorDetalleScreenState extends State<RepartidorDetalleScreen> {
     );
 
     if (confirmed != true) return;
-    final observacion = obsCtrl.text.trim();
-    if (observacion.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Debes escribir una observación')),
-        );
-      }
-      return;
-    }
 
     try {
-      await context.read<AppState>().marcarEntregaNoEntregada(pedido.id, observacion);
+      await appState.marcarEntregaNoEntregada(pedido.id);
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {

@@ -631,49 +631,53 @@ class AppState extends ChangeNotifier {
       origen: origen,
     );
 
+    if (_token == null) {
+      throw Exception('Sesión no iniciada. Por favor, vuelve a iniciar sesión.');
+    }
+
     _pedidos.add(nuevoPedido);
     notifyListeners();
 
-    if (_token != null) {
-      final payload = {
-        'clienteId': int.tryParse(cliente.id),
-        'clienteNombre': cliente.nombre,
-        'clienteTelefono': '',
-        'clienteDireccion': cliente.direccion,
-        'fechaEntrega': fechaEntrega?.toIso8601String().split('T').first,
-        'observaciones': observaciones,
-        'productos': nuevoPedido.items
-            .map((i) => {
-                  'id': int.tryParse(i.producto.id),
-                  'nombre': i.producto.nombre,
-                  'precio': i.producto.precio,
-                  'cantidad': i.cantidad,
-                })
-            .where((p) => p['id'] != null)
-            .toList(),
-        'abonos': (abonos ?? [])
-            .map((a) => {'monto': a.monto, 'tipo': a.tipo})
-            .toList(),
-      };
+    final payload = {
+      'clienteId': int.tryParse(cliente.id),
+      'clienteNombre': cliente.nombre,
+      'clienteTelefono': '',
+      'clienteDireccion': cliente.direccion,
+      'fechaEntrega': fechaEntrega?.toIso8601String().split('T').first,
+      'observaciones': observaciones,
+      'productos': nuevoPedido.items
+          .map((i) => {
+                'id': int.tryParse(i.producto.id),
+                'nombre': i.producto.nombre,
+                'precio': i.producto.precio,
+                'cantidad': i.cantidad,
+              })
+          .where((p) => p['id'] != null)
+          .toList(),
+      'abonos': (abonos ?? [])
+          .map((a) => {'monto': a.monto, 'tipo': a.tipo})
+          .toList(),
+    };
 
-      try {
-        // Esperar que el POST termine antes de refrescar
-        await _dio.post(ApiConfig.pedidos, data: payload);
-        // ignore: avoid_print
-        print('[AppState] guardarPedido → POST exitoso, refrescando pedidos...');
-      } catch (e) {
-        // Si falla, quitar el pedido optimista y propagar el error
-        _pedidos.remove(nuevoPedido);
-        notifyListeners();
-        // ignore: avoid_print
-        print('[AppState] guardarPedido POST error: $e');
-        rethrow;
-      }
+    // ignore: avoid_print
+    print('[AppState] guardarPedido → enviando POST a ${ApiConfig.pedidos}');
+    // ignore: avoid_print
+    print('[AppState] productos en payload: ${(payload['productos'] as List).length}');
 
-      // Refrescar DESPUÉS que el POST fue confirmado
-      await fetchPedidos();
-      unawaited(fetchAbonos());
+    try {
+      final response = await _dio.post(ApiConfig.pedidos, data: payload);
+      // ignore: avoid_print
+      print('[AppState] guardarPedido → POST exitoso (${response.statusCode}), refrescando...');
+    } catch (e) {
+      _pedidos.remove(nuevoPedido);
+      notifyListeners();
+      // ignore: avoid_print
+      print('[AppState] guardarPedido POST error: $e');
+      rethrow;
     }
+
+    await fetchPedidos();
+    unawaited(fetchAbonos());
   }
 
   Future<void> agregarAbonoPedido(String pedidoId, AbonoPedido abono) async {
@@ -950,35 +954,18 @@ class AppState extends ChangeNotifier {
 
   /// Marca un pedido como entregado en el sistema de entregas (Repartidor).
   Future<void> marcarEntregaAtendida(String pedidoId) async {
-    final pedidoIdx = _pedidos.indexWhere((p) => p.id == pedidoId);
-    if (pedidoIdx < 0) throw Exception('Pedido no encontrado');
-
-    final clienteId = _pedidos[pedidoIdx].cliente.id;
-    final clienteIdx = _clientes.indexWhere((c) => c.id == clienteId);
-    final estadoAnterior = clienteIdx >= 0 ? _clientes[clienteIdx].estado : null;
-
-    if (clienteIdx >= 0) {
-      _clientes[clienteIdx].estado = EstadoCliente.entregado;
-      notifyListeners();
-    }
-
-    try {
-      await _dio.patch(
-        '${ApiConfig.entregas}/pedidos/$pedidoId/estado',
-        data: {'estado_asignacion': 'Atendida'},
-      );
-      await fetchClientes();
-    } catch (e) {
-      if (clienteIdx >= 0 && estadoAnterior != null) {
-        _clientes[clienteIdx].estado = estadoAnterior;
-        notifyListeners();
-      }
-      rethrow;
-    }
+    await _marcarEntrega(pedidoId, entregado: true);
   }
 
-  /// Marca un pedido como no entregado (Rechazada) con observación del repartidor.
-  Future<void> marcarEntregaNoEntregada(String pedidoId, String observacion) async {
+  /// Marca un pedido como no entregado — queda disponible para reasignación.
+  Future<void> marcarEntregaNoEntregada(String pedidoId) async {
+    await _marcarEntrega(pedidoId, entregado: false);
+  }
+
+  Future<void> _marcarEntrega(String pedidoId, {required bool entregado}) async {
+    final entregaId = _rutaActual?['id']?.toString();
+    if (entregaId == null) throw Exception('No hay entrega activa asignada');
+
     final pedidoIdx = _pedidos.indexWhere((p) => p.id == pedidoId);
     if (pedidoIdx < 0) throw Exception('Pedido no encontrado');
 
@@ -987,14 +974,15 @@ class AppState extends ChangeNotifier {
     final estadoAnterior = clienteIdx >= 0 ? _clientes[clienteIdx].estado : null;
 
     if (clienteIdx >= 0) {
-      _clientes[clienteIdx].estado = EstadoCliente.noEntregado;
+      _clientes[clienteIdx].estado =
+          entregado ? EstadoCliente.entregado : EstadoCliente.noEntregado;
       notifyListeners();
     }
 
     try {
       await _dio.patch(
-        '${ApiConfig.entregas}/pedidos/$pedidoId/estado',
-        data: {'estado_asignacion': 'Rechazada', 'observacion': observacion},
+        '${ApiConfig.entregas}/$entregaId/pedidos/$pedidoId/entregado',
+        data: {'entregado': entregado},
       );
       await fetchClientes();
     } catch (e) {

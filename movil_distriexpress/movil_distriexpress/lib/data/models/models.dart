@@ -244,7 +244,6 @@ class ClienteModel {
   final double lng;
   final double saldoPendiente;
   EstadoCliente estado;
-  final String? observacion;
 
   ClienteModel({
     required this.id,
@@ -255,7 +254,6 @@ class ClienteModel {
     required this.lng,
     this.saldoPendiente = 0,
     this.estado = EstadoCliente.pendiente,
-    this.observacion,
   });
 
   factory ClienteModel.fromJson(Map<String, dynamic> json) => ClienteModel(
@@ -268,7 +266,6 @@ class ClienteModel {
         saldoPendiente:
             _toDouble(json['saldo_pendiente'] ?? json['saldoPendiente']),
         estado: EstadoCliente.fromString((json['estado'] ?? 'pendiente').toString()),
-        observacion: json['observacion']?.toString(),
       );
 }
 
