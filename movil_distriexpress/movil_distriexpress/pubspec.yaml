@@ -46,6 +46,15 @@ dev_dependencies:
   flutter_lints: ^3.0.0
   bloc_test: ^9.1.5
   mocktail: ^1.0.1
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/logo.png"
+  web:
+    generate: true
+    image_path: "assets/images/logo.png"
 
 flutter:
   uses-material-design: true

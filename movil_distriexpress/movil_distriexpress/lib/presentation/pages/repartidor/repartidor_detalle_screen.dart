@@ -34,7 +34,7 @@ class _RepartidorDetalleScreenState extends State<RepartidorDetalleScreen> {
         title: const Row(children: [
           Icon(Icons.cancel_outlined, color: AppTheme.error),
           SizedBox(width: 10),
-          Text('No Entregado'),
+          Text('No entregado'),
         ]),
         content: const Text(
           '¿Confirmas que no se pudo realizar esta entrega?\n\nEl pedido quedará disponible para ser reasignado.',
@@ -365,7 +365,7 @@ class _RepartidorDetalleScreenState extends State<RepartidorDetalleScreen> {
                               children: [
                                 Icon(Icons.receipt_long_outlined, size: 14, color: AppTheme.primary),
                                 SizedBox(width: 5),
-                                Text('Ver Pedido',
+                                Text('Ver pedido',
                                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.primary)),
                               ],
                             ),
@@ -613,7 +613,7 @@ class _RepartidorDetalleScreenState extends State<RepartidorDetalleScreen> {
                       child: ElevatedButton.icon(
                         onPressed: () => _marcarNoEntregado(pedidoPrincipal),
                         icon: const Icon(Icons.close_rounded, size: 18),
-                        label: const Text('No Entregado'),
+                        label: const Text('No entregado'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.error,
                           padding: const EdgeInsets.symmetric(vertical: 14),
@@ -665,7 +665,7 @@ class _PedidoDetalleModal extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    'Detalle del Pedido',
+                    'Detalle del pedido',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,

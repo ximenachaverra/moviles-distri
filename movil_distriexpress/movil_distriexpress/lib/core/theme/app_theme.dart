@@ -2,22 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
-  // Colors
-  static const Color primary = Color(0xFF1A56DB);
-  static const Color primaryDark = Color(0xFF1040A8);
-  static const Color primaryLight = Color(0xFFEBF0FF);
-  static const Color accent = Color(0xFF00C896);
+  // Colores principales — verde DistriExpress
+  static const Color primary      = Color(0xFF1A6B35);
+  static const Color primaryDark  = Color(0xFF134F27);
+  static const Color primaryLight = Color(0xFFE8F5EC);
+  static const Color accent       = Color(0xFF00C896);
   static const Color accentOrange = Color(0xFFFF6B35);
-  static const Color background = Color(0xFFF5F7FA);
-  static const Color surface = Color(0xFFFFFFFF);
-  static const Color textPrimary = Color(0xFF0D1B2A);
+  static const Color background    = Color(0xFFF5F7FA);
+  static const Color surface       = Color(0xFFFFFFFF);
+  static const Color textPrimary   = Color(0xFF0D1B2A);
   static const Color textSecondary = Color(0xFF6B7A99);
-  static const Color border = Color(0xFFE2E8F0);
+  static const Color border        = Color(0xFFE2E8F0);
   static const Color success = Color(0xFF10B981);
   static const Color warning = Color(0xFFF59E0B);
-  static const Color error = Color(0xFFEF4444);
-  static const Color repartidorColor = Color(0xFF6C3FC7);
-  static const Color promotorColor = Color(0xFF1A56DB);
+  static const Color error   = Color(0xFFEF4444);
+  static const Color repartidorColor = Color(0xFF1A6B35);
+  static const Color promotorColor   = Color(0xFF1A6B35);
 
   static ThemeData get lightTheme => ThemeData(
     useMaterial3: true,

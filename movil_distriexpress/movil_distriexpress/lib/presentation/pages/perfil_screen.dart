@@ -57,9 +57,9 @@ class _PerfilScreenState extends State<PerfilScreen> {
         appBar: AppBar(
           backgroundColor: AppTheme.surface,
           elevation: 0,
-          title: const Text('Mi Perfil', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+          title: const Text('Mi perfil', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
         ),
-        body: const Center(child: Text('No hay sesion activa')),
+        body: const Center(child: Text('No hay sesión activa')),
       );
     }
 
@@ -73,7 +73,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
       appBar: AppBar(
         backgroundColor: AppTheme.surface,
         elevation: 0,
-        title: const Text('Mi Perfil', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+        title: const Text('Mi perfil', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_rounded, color: AppTheme.textPrimary),
           onPressed: () => Navigator.pop(context),

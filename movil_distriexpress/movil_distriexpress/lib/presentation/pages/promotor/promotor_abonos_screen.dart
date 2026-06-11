@@ -212,7 +212,7 @@ class _PromotorAbonosScreenState extends State<PromotorAbonosScreen> {
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: const Text('Módulo de Abonos'),
+        title: const Text('Módulo de abonos'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_rounded),
           onPressed: () => Navigator.pop(context),

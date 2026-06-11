@@ -154,7 +154,7 @@ class _AbonosScreenState extends State<AbonosScreen> {
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: const Text('Mòdulo de Abonos'),
+        title: const Text('Módulo de abonos'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_rounded),
           onPressed: () => Navigator.pop(context),
@@ -564,9 +564,9 @@ class _AbonosScreenState extends State<AbonosScreen> {
                         }),
                       ],
                       const SizedBox(height: 16),
-                      // ObservaciÃ³n
+                      // Observación
                       const Text(
-                        'ObservaciÃ³n (opcional)',
+                        'Observación (opcional)',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,

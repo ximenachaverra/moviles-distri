@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/app_state.dart';
@@ -15,15 +15,9 @@ class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin {
   final _loginFormKey = GlobalKey<FormState>();
 
-  // Login fields
-  final _emailController = TextEditingController();
+  final _emailController    = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
-
-  @override
-  void initState() {
-    super.initState();
-  }
 
   @override
   void dispose() {
@@ -60,22 +54,28 @@ class _LoginScreenState extends State<LoginScreen>
               Center(
                 child: Column(
                   children: [
-                    Container(
-                      width: 72,
-                      height: 72,
-                      decoration: BoxDecoration(
-                        color: AppTheme.primary,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppTheme.primary.withValues(alpha: 0.35),
-                            blurRadius: 20,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
+                    Image.asset(
+                      'assets/images/logo.png',
+                      width: 130,
+                      height: 130,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppTheme.primary.withValues(alpha: 0.35),
+                              blurRadius: 20,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(Icons.local_shipping_rounded,
+                            color: Colors.white, size: 38),
                       ),
-                      child: const Icon(Icons.local_shipping_rounded,
-                          color: Colors.white, size: 38),
                     ),
                     const SizedBox(height: 16),
                     const Text(
@@ -142,7 +142,7 @@ class _LoginScreenState extends State<LoginScreen>
               ),
             ),
             validator: (v) =>
-                v == null || v.length < 6 ? 'MÃ­nimo 6 caracteres' : null,
+                v == null || v.length < 6 ? 'Mínimo 6 caracteres' : null,
           ),
           Align(
             alignment: Alignment.centerRight,
@@ -171,36 +171,6 @@ class _LoginScreenState extends State<LoginScreen>
                     )
                   : const Text('Iniciar sesión'),
             ),
-          ),
-          const SizedBox(height: 16),
-          _buildDemoHint(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDemoHint() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppTheme.primaryLight,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Demo',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.primary,
-            ),
-          ),
-          SizedBox(height: 4),
-          Text(
-            'Repartidor: cualquier@correo.com\nPromotor: promotor@correo.com\nContrasena: cualquiera',
-            style: TextStyle(fontSize: 11, color: AppTheme.primary),
           ),
         ],
       ),

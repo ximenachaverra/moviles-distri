@@ -830,7 +830,7 @@ class _PedidoDetalleCard extends StatelessWidget {
                 });
               },
               icon: const Icon(Icons.edit_rounded, size: 18),
-              label: const Text('Editar Pedido'),
+              label: const Text('Editar pedido'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primary,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
